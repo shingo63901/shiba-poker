@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>柴犬撲克 v1.2.0</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<title>柴犬撲克 v1.2.1</title>
 <style>
 /* ==========================================================================
    區段：全域樣式（v1.1.0 暖色像素風）
@@ -164,7 +165,7 @@ body{
 
   <!-- 右側主區 -->
   <div id="main">
-    <div id="gameTitle">柴犬撲克 v1.2.0</div>
+    <div id="gameTitle">柴犬撲克 v1.2.1</div>
     <div id="topRow">
       <div class="slotWrap">
         <div class="cap">柴犬牌</div>
@@ -194,9 +195,10 @@ body{
 
 <script>
 /* ==========================================================================
-   柴犬撲克 v1.2.0
+   柴犬撲克 v1.2.1
    純原創內容。機制致敬 Balatro；美術、文案、命名全部原創（柴犬主題）。
    v1.2.0：牌面簡化（大點數+花色）、小丑改用柴犬 sprite、盲注狀態標籤。
+   v1.2.1：加入 meta CSP（封鎖外連/外部資源，安全強化）。
    ========================================================================== */
 'use strict';
 
