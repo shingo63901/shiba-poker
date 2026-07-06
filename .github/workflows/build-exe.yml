@@ -1,4 +1,4 @@
-name: Build pv.exe (Windows)
+name: Build Project-PV (Windows)
 
 on:
   push:
@@ -29,18 +29,31 @@ jobs:
           pip install pytest
           python -m pytest statistical-validation-py/tests -q
 
-      - name: Build single-file executable
+      - name: Build one-folder distribution
         run: |
-          pyinstaller --onefile --name pv --console --clean --noconfirm statistical-validation-py/packaging/pv_entry.py
+          pyinstaller --onedir --name pv --console --clean --noconfirm statistical-validation-py/packaging/pv_entry.py
 
-      - name: Smoke test executable
+      - name: Assemble Project-PV folder
+        shell: pwsh
         run: |
-          ./dist/pv.exe demo
-          ./dist/pv.exe chi-ind --rows "460,40;482,18"
+          New-Item -ItemType Directory -Path out/Project-PV | Out-Null
+          Copy-Item -Recurse dist/pv/* out/Project-PV/
+          Copy-Item 'statistical-validation-py/packaging/windows/使用說明.txt' out/Project-PV/
+          & out/Project-PV/pv.exe sample-data out/Project-PV/範例資料.xlsx
+          $demo = "@echo off","chcp 65001 >nul",'cd /d "%~dp0"',"pv.exe demo","echo.","pause"
+          Set-Content -Path 'out/Project-PV/執行範例.bat' -Value $demo -Encoding ascii
+          $advisor = "@echo off","chcp 65001 >nul",'cd /d "%~dp0"',"pv.exe advisor","echo.","pause"
+          Set-Content -Path 'out/Project-PV/檢定選擇指引.bat' -Value $advisor -Encoding ascii
+
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          & out/Project-PV/pv.exe demo
+          & out/Project-PV/pv.exe chi-ind --rows "460,40;482,18"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pv-windows-exe
-          path: dist/pv.exe
+          name: Project-PV-windows
+          path: out
           retention-days: 90
