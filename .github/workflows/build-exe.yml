@@ -1,0 +1,46 @@
+name: Build pv.exe (Windows)
+
+on:
+  push:
+    branches:
+      - claude/statistical-validation-project-wi808l
+      - main
+    paths:
+      - "statistical-validation-py/**"
+      - ".github/workflows/build-exe.yml"
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package and PyInstaller
+        run: |
+          pip install pyinstaller ./statistical-validation-py
+
+      - name: Run tests
+        run: |
+          pip install pytest
+          python -m pytest statistical-validation-py/tests -q
+
+      - name: Build single-file executable
+        run: |
+          pyinstaller --onefile --name pv --console --clean --noconfirm statistical-validation-py/packaging/pv_entry.py
+
+      - name: Smoke test executable
+        run: |
+          ./dist/pv.exe demo
+          ./dist/pv.exe chi-ind --rows "460,40;482,18"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pv-windows-exe
+          path: dist/pv.exe
+          retention-days: 90
