@@ -105,31 +105,42 @@
   let STAGE_LIST = []; // 章節 {id,title,count}
   let inputRoleStr = null, inputUserStr = null;
 
-  const STAGE_META = {
-    cross:     { title: '① 底部白十字', hint: '把四個白色邊塊在底面排成十字，並對齊四周中心。' },
-    f2l:       { title: '② 前兩層配對', hint: '把白色角塊和它旁邊的中層邊塊，一組一組放進去。' },
-    ollEdge:   { title: '③ 頂面黃十字', hint: '讓頂面的四個邊變成黃色，形成十字。' },
-    ollCorner: { title: '④ 頂面全變黃', hint: '把四個角轉正，讓整個頂面都是黃色。' },
-    pll:       { title: '⑤ 對齊完成', hint: '把頂層的角和邊移到正確位置，還原完成！' },
-  };
+  // CFOP 四大階段的號碼與說明
+  const STAGE_STEP = { cross: '第 1 步 · Cross', f2l: '第 2 步 · F2L', oll: '第 3 步 · OLL', pll: '第 4 步 · PLL' };
 
-  function notationOf(face, q) { return face + (q === 1 ? '' : q === 2 ? '2' : "'"); }
-  function sayOf(face, q) {
-    const dir = q === 1 ? '順時針轉 90°' : q === 3 ? '逆時針轉 90°' : '轉 180°';
-    return `把「${FACE_TURN_CN[face]}」${dir}（面對這一面看）`;
+  // 各種轉法的中文說明
+  const TURN_CN = {
+    U: '上層', D: '下層', R: '右層', L: '左層', F: '前層', B: '後層',
+    M: '中間直排(跟左層方向)', E: '中間橫排(跟下層方向)', S: '中間直排(跟前層方向)',
+    r: '右邊兩層', l: '左邊兩層', u: '上面兩層', d: '下面兩層', f: '前面兩層', b: '後面兩層',
+    x: '整顆(跟右層方向翻)', y: '整顆(跟上層方向轉)', z: '整顆(跟前層方向轉)',
+  };
+  function notationOf(token, q) {
+    // 顯示：寬轉用小寫、旋轉用小寫；prime/2
+    const suf = q === 1 ? '' : q === 2 ? '2' : "'";
+    return token + suf;
+  }
+  function sayOf(token, q) {
+    const name = TURN_CN[token] || token;
+    const dir = q === 1 ? '順時針 90°' : q === 3 ? '逆時針 90°' : '180°';
+    if ('xyz'.includes(token)) return `把整顆方塊 ${name.replace('整顆','').replace(/[()]/g,'')} 轉 ${dir}`;
+    return `把「${name}」轉 ${dir}`;
   }
 
   function buildSteps(stages) {
     STEPS = []; STAGE_LIST = [];
     let f2lCount = 0;
     for (const st of stages) {
-      let title = (STAGE_META[st.id] || { title: st.title }).title;
-      if (st.id === 'f2l') { f2lCount++; title = `② 前兩層配對 ${f2lCount}`; }
+      let title = st.title;
+      if (st.id === 'f2l') { f2lCount++; }
+      const stepTag = STAGE_STEP[st.id] || '';
       STAGE_LIST.push({ id: st.id, title, count: st.moves.length });
       for (const m of st.moves) {
+        const token = m.move || m.face;
         STEPS.push({
-          stageId: st.id, stageTitle: title, face: m.face, quarter: m.quarter,
-          notation: notationOf(m.face, m.quarter), say: sayOf(m.face, m.quarter),
+          stageId: st.id, stageTitle: title, stepTag, desc: st.desc,
+          token, quarter: m.quarter,
+          notation: notationOf(token, m.quarter), say: sayOf(token, m.quarter),
         });
       }
     }
@@ -173,38 +184,32 @@
     }
   }
 
-  // 動畫轉一層：move={face,quarter}
-  const SPIN = { x: 1, y: 1, z: 1 };  // 視覺旋轉方向校正（必要時翻正負）
-  function animateMove(model, move, ms, done) {
-    const f = E.FACE[move.face];
-    const idx = f.axis === 'x' ? 0 : f.axis === 'y' ? 1 : 2;
-    // 收集該層 cubie 的 DOM
+  // 動畫轉一層／多層／整顆：move={token,quarter}
+  function animateMove(model, move, ms) {
+    const token = move.token || move.move || move.face;
+    const spec = E.MOVE_SPEC[token];
+    if (!spec) { E.applyMove(model, token, move.quarter); renderCube(model); return; }
+    const idx = spec.axis === 'x' ? 0 : spec.axis === 'y' ? 1 : 2;
     const pivot = document.createElement('div');
     pivot.className = 'pivot';
     cubeEl.appendChild(pivot);
-    const moving = [];
     for (const el of Array.from(cubeEl.children)) {
       if (el === pivot) continue;
       const pos = el.dataset.key.split(',').map(Number);
-      if (pos[idx] === f.val) { moving.push(el); pivot.appendChild(el); }
+      if (spec.layers.indexOf(pos[idx]) !== -1) pivot.appendChild(el);
     }
-    // 旋轉角度：用「最短」等效轉法（' 走 -90 而非 +270）。
-    const qturns = move.quarter === 3 ? -1 : move.quarter; // 1→+90, 2→180, 3(')→-90
-    const modelDeg = f.rd * 90 * qturns;
-    const axisVec = f.axis === 'x' ? '1,0,0' : f.axis === 'y' ? '0,1,0' : '0,0,1';
-    const deg = -modelDeg * SPIN[f.axis];
-    // 起始為 0，下一個 frame 設定目標以觸發 transition
+    // 旋轉角度：用「最短」等效轉法（' 走 -90 而非 +270）
+    const qturns = move.quarter === 3 ? -1 : move.quarter;
+    const modelDeg = spec.rd * 90 * qturns;
+    const axisVec = spec.axis === 'x' ? '1,0,0' : spec.axis === 'y' ? '0,1,0' : '0,0,1';
+    const deg = -modelDeg; // 位置把模型 +y 對到螢幕上方，旋轉角需取反
     pivot.style.transition = 'none';
     pivot.style.transform = 'rotate3d(0,0,1,0deg)';
     requestAnimationFrame(() => {
       pivot.style.transition = `transform ${ms}ms ease-in-out`;
       pivot.style.transform = `rotate3d(${axisVec},${deg}deg)`;
     });
-    const finish = () => {
-      E.applyFace(model, move.face, move.quarter);
-      renderCube(model);
-    };
-    setTimeout(finish, ms + 20);
+    setTimeout(() => { E.applyMove(model, token, move.quarter); renderCube(model); }, ms + 20);
   }
 
   // ---------- 播放控制 ----------
@@ -214,7 +219,7 @@
   function modelAtStart() { return E.fromFacelets(inputUserStr); }
   function rebuildTo(n) {  // 直接重算到第 n 步（不動畫）
     const m = modelAtStart();
-    for (let i = 0; i < n; i++) E.applyFace(m, STEPS[i].face, STEPS[i].quarter);
+    for (let i = 0; i < n; i++) E.applyMove(m, STEPS[i].token, STEPS[i].quarter);
     return m;
   }
   function speedMs() { const v = +$('speed').value; return Math.round(560 - v * 46); }
@@ -233,9 +238,9 @@
       $('siProg').textContent = `${total} / ${total}`;
     } else {
       const s = STEPS[cur];
-      $('siStage').textContent = s.stageTitle;
+      $('siStage').textContent = (s.stepTag ? s.stepTag + '　' : '') + s.stageTitle;
       $('siNotation').textContent = s.notation;
-      $('siSay').textContent = s.say;
+      $('siSay').textContent = s.say + (s.desc ? '　—　' + s.desc : '');
       $('siProg').textContent = `第 ${cur + 1} / ${total} 步`;
     }
     // 章節 chips
@@ -272,7 +277,7 @@
       animateMove(liveModel, mv, speedMs());
       setTimeout(() => { animating = false; afterStep(); }, speedMs() + 40);
     } else {
-      E.applyFace(liveModel, mv.face, mv.quarter); renderCube(liveModel); afterStep();
+      E.applyMove(liveModel, mv.token, mv.quarter); renderCube(liveModel); afterStep();
     }
   }
   function afterStep() {

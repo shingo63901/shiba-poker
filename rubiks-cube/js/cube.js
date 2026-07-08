@@ -69,7 +69,33 @@ function applyFace(cube, face, quarter = 1) {
   return cube;
 }
 
-// 解析 move 字串（如 "R U R' U'"）→ 陣列 [{face,quarter}]
+// ---- 完整轉法（面 / 寬轉 / 中層 / 整體旋轉）供 CFOP 公式使用 ----
+// spec：作用哪些層（該軸座標）、旋轉軸、旋轉方向
+const MOVE_SPEC = {
+  U: { axis: 'y', layers: [1], rd: -1 }, D: { axis: 'y', layers: [-1], rd: 1 },
+  R: { axis: 'x', layers: [1], rd: -1 }, L: { axis: 'x', layers: [-1], rd: 1 },
+  F: { axis: 'z', layers: [1], rd: -1 }, B: { axis: 'z', layers: [-1], rd: 1 },
+  M: { axis: 'x', layers: [0], rd: 1 }, E: { axis: 'y', layers: [0], rd: 1 }, S: { axis: 'z', layers: [0], rd: -1 },
+  r: { axis: 'x', layers: [1, 0], rd: -1 }, l: { axis: 'x', layers: [-1, 0], rd: 1 },
+  u: { axis: 'y', layers: [1, 0], rd: -1 }, d: { axis: 'y', layers: [-1, 0], rd: 1 },
+  f: { axis: 'z', layers: [1, 0], rd: -1 }, b: { axis: 'z', layers: [-1, 0], rd: 1 },
+  x: { axis: 'x', layers: [1, 0, -1], rd: -1 }, y: { axis: 'y', layers: [1, 0, -1], rd: -1 }, z: { axis: 'z', layers: [1, 0, -1], rd: -1 },
+};
+function applyMove(cube, token, quarter = 1) {
+  const spec = MOVE_SPEC[token];
+  if (!spec) return cube;
+  const idx = spec.axis === 'x' ? 0 : spec.axis === 'y' ? 1 : 2;
+  for (let q = 0; q < quarter; q++) {
+    for (const cu of cube) {
+      if (spec.layers.indexOf(cu.pos[idx]) === -1) continue;
+      cu.pos = rot(cu.pos, spec.axis, spec.rd);
+      for (const s of cu.stickers) s.dir = rot(s.dir, spec.axis, spec.rd);
+    }
+  }
+  return cube;
+}
+
+// 解析 move 字串（支援 R U R' / Rw r M x y z / U2 …）→ [{move,quarter}]
 function parseMoves(str) {
   if (!str) return [];
   return str
@@ -77,21 +103,22 @@ function parseMoves(str) {
     .split(/\s+/)
     .filter(Boolean)
     .map((m) => {
-      const face = m[0];
       let quarter = 1;
-      if (m.includes('2')) quarter = 2;
-      else if (m.includes("'")) quarter = 3;
-      return { face, quarter };
+      if (m.indexOf('2') !== -1) quarter = 2;
+      else if (m.indexOf("'") !== -1) quarter = 3;
+      let base = m.replace(/['2]/g, '');
+      if (base.length === 2 && base[1] === 'w') base = base[0].toLowerCase(); // Rw → r
+      return { move: base, quarter };
     });
 }
 function applyMoves(cube, str) {
-  for (const mv of parseMoves(str)) applyFace(cube, mv.face, mv.quarter);
+  for (const mv of parseMoves(str)) applyMove(cube, mv.move, mv.quarter);
   return cube;
 }
 function invertMoves(str) {
   return parseMoves(str)
     .reverse()
-    .map((m) => m.face + (m.quarter === 1 ? "'" : m.quarter === 2 ? '2' : ''))
+    .map((m) => m.move + (m.quarter === 1 ? "'" : m.quarter === 2 ? '2' : ''))
     .join(' ');
 }
 
@@ -158,7 +185,7 @@ function fromFacelets(str) {
 }
 
 const _exports = {
-  rot, FACE, SCHEME, solvedCube, clone, applyFace, parseMoves,
+  rot, FACE, MOVE_SPEC, SCHEME, solvedCube, clone, applyFace, applyMove, parseMoves,
   applyMoves, invertMoves, toFacelets, fromFacelets, FACE_BASIS, FACE_ORDER, stickerAt, eq,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = _exports;

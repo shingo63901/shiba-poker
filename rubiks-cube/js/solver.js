@@ -7,6 +7,7 @@
 // ==========================================================================
 'use strict';
 const E = (typeof require !== 'undefined') ? require('./cube.js') : window.RCube;
+const ALGS = (typeof require !== 'undefined') ? require('./algs.js') : window.CFOP_ALGS;
 const { solvedCube, clone, applyFace, eq } = E;
 
 // ---- 參考：已還原方塊中每個塊的「家」 ----
@@ -222,29 +223,29 @@ function adjacentSidePairs() {
   ];
 }
 
-// 化簡：合併同面連續轉動、消去互逆（考慮相對面可交換順序）
+// 統一取得 move token（相容舊 {face} 與新 {move}）
+const tk = (m) => m.move || m.face;
+// 化簡：合併同面連續轉動、消去互逆（僅限單面 UDLRFB；寬轉/中層/旋轉不動）
 function simplifyMoves(mvs) {
   const st = [];
   for (const mv of mvs) {
-    let m = { face: mv.face, quarter: mv.quarter };
-    // 找可合併對象：最後一個非「與 m 相對面」的同面移動之後不可跨越；
-    // 簡化處理：只與堆疊頂端同面合併；若頂端是相對面則可再往下看一層
+    const t = tk(mv);
+    const m = { move: t, quarter: mv.quarter };
     let merged = false;
-    if (st.length && st[st.length - 1].face === m.face) {
-      const top = st[st.length - 1];
-      const q = (top.quarter + m.quarter) % 4;
-      st.pop();
-      if (q !== 0) st.push({ face: m.face, quarter: q });
-      merged = true;
-    } else if (st.length >= 2 && OPP[st[st.length - 1].face] === m.face &&
-               st[st.length - 2].face === m.face) {
-      const t2 = st[st.length - 2];
-      const q = (t2.quarter + m.quarter) % 4;
-      const opp = st.pop();
-      st.pop();
-      if (q !== 0) st.push({ face: m.face, quarter: q });
-      st.push(opp);
-      merged = true;
+    if (OPP[t]) { // 只對基本面做化簡
+      if (st.length && st[st.length - 1].move === t) {
+        const q = (st[st.length - 1].quarter + m.quarter) % 4;
+        st.pop();
+        if (q !== 0) st.push({ move: t, quarter: q });
+        merged = true;
+      } else if (st.length >= 2 && OPP[st[st.length - 1].move] === t &&
+                 st[st.length - 2].move === t) {
+        const q = (st[st.length - 2].quarter + m.quarter) % 4;
+        const opp = st.pop(); st.pop();
+        if (q !== 0) st.push({ move: t, quarter: q });
+        st.push(opp);
+        merged = true;
+      }
     }
     if (!merged) st.push(m);
   }
@@ -253,7 +254,7 @@ function simplifyMoves(mvs) {
 
 function movesToStr(mvs) {
   return mvs
-    .map((m) => m.face + (m.quarter === 1 ? '' : m.quarter === 2 ? '2' : "'"))
+    .map((m) => tk(m) + (m.quarter === 1 ? '' : m.quarter === 2 ? '2' : "'"))
     .join(' ');
 }
 
@@ -344,10 +345,13 @@ function solve(scrambleFaceletsCubeOrMoves) {
   const cube = clone(scrambleFaceletsCubeOrMoves);
   const stages = []; // {id,title,moves:[{face,quarter}], desc}
 
-  function record(id, title, mvs, desc) {
-    const sm = simplifyMoves(mvs || []);
+  const fallbacks = {};
+  function record(id, title, mvs, desc, noSimplify) {
+    const norm = (mvs || []).map((m) => ({ move: m.move || m.face, quarter: m.quarter }));
+    const sm = noSimplify ? norm : simplifyMoves(norm);
     if (sm.length) stages.push({ id, title, moves: sm, desc });
   }
+  function applyStep(mvs) { for (const m of mvs) E.applyMove(cube, m.move || m.face, m.quarter); }
   function runSet(targetSet, locked, id, title, desc, maxD) {
     const mvs = idaSolveSet(cube, targetSet, locked, maxD || 14);
     if (mvs === null) throw new Error('IDA fail ' + title);
@@ -379,53 +383,140 @@ function solve(scrambleFaceletsCubeOrMoves) {
     locked.push(slot.c, slot.e);
   }
 
-  // ---- 4. 頂層黃十字（OLL 邊）----
-  const yellowCrossEdges = adjacentSidePairsYellow();
-  const isYellowCross = (c) => yellowEdgesOriented(c);
-  const ollEdgeMacros = [
-    { name: 'U', str: 'U' }, { name: 'U2', str: 'U2' }, { name: "U'", str: "U'" },
-    { name: 'FRUF', str: "F R U R' U' F'" },
-  ];
+  // ---- 4. OLL：一個公式把整個頂面轉成黃色 ----
   {
-    const path = macroBFS(cube, ollEdgeMacros, isYellowCross, 10);
-    if (path === null) throw new Error('OLL-edge fail');
-    const mvs = expandMacros(path);
-    for (const m of mvs) applyFace(cube, m.face, m.quarter);
-    record('ollEdge', '頂層黃十字', mvs, '黃色十字');
+    const r = solveOLL(cube);
+    if (r) { applyStep(r.moves); record('oll', 'OLL ' + r.label, r.moves, r.desc, true); }
+    else {
+      fallbacks.oll = true; fallbacks.ollState = E.toFacelets(cube);
+      const mvs = twoLookOLL(cube);
+      record('oll', '頂面轉正（兩段式）', mvs, '先做黃十字，再把黃角轉正', true);
+    }
   }
 
-  // ---- 5. 頂層黃角朝向（OLL 角）----
-  const ollCornerMacros = [
-    { name: 'U', str: 'U' }, { name: 'U2', str: 'U2' }, { name: "U'", str: "U'" },
-    { name: 'Sune', str: "R U R' U R U2 R'" },
-  ];
+  // ---- 5. PLL：一個公式把頂層排到正確位置 ----
   {
-    const path = macroBFS(cube, ollCornerMacros, allYellowUp, 12);
-    if (path === null) throw new Error('OLL-corner fail');
-    const mvs = expandMacros(path);
-    for (const m of mvs) applyFace(cube, m.face, m.quarter);
-    record('ollCorner', '頂面全黃', mvs, '黃角朝上');
-  }
-
-  // ---- 6. PLL：角 + 邊 歸位 ----
-  const pllMacros = [
-    { name: 'U', str: 'U' }, { name: 'U2', str: 'U2' }, { name: "U'", str: "U'" },
-    // 角三循環（A-perm，固定邊）
-    { name: 'CornerCycle', str: "R' F R' B2 R F' R' B2 R2" },
-    // 邊三循環（U-perm）
-    { name: 'EdgeCycle', str: "R U' R U R U R U' R' U' R2" },
-  ];
-  {
-    const path = macroBFS(cube, pllMacros, isSolved, 14);
-    if (path === null) throw new Error('PLL fail');
-    const mvs = expandMacros(path);
-    for (const m of mvs) applyFace(cube, m.face, m.quarter);
-    record('pll', '頂層歸位', mvs, '完成');
+    const r = solvePLL(cube);
+    if (r) { applyStep(r.moves); record('pll', 'PLL ' + r.label, r.moves, r.desc, true); }
+    else {
+      fallbacks.pll = true; fallbacks.pllState = E.toFacelets(cube);
+      const mvs = twoLookPLL(cube);
+      record('pll', '頂層排列（兩段式）', mvs, '先排角、再排邊', true);
+    }
   }
 
   if (!isSolved(cube)) throw new Error('NOT SOLVED at end');
-  return { stages, solvedCheck: isSolved(cube) };
+  return { stages, solvedCheck: isSolved(cube), fallbacks };
 }
+
+// ---- CFOP 頂層辨識（套用後驗證，保證正確）----
+function solveOLL(cube) {
+  if (allYellowUp(cube)) return { moves: [], label: '（跳過）', desc: '頂面本來就全是黃色，這一步不用做。' };
+  for (let auf = 0; auf < 4; auf++) {
+    for (const o of ALGS.OLL) {
+      const c = clone(cube);
+      if (auf) E.applyMove(c, 'U', auf);
+      E.applyMoves(c, o.alg);
+      if (allYellowUp(c)) {
+        const moves = [];
+        if (auf) moves.push({ move: 'U', quarter: auf });
+        moves.push(...E.parseMoves(o.alg));
+        return { moves, label: '#' + o.n + (o.name ? '（' + o.name + '）' : ''), desc: '用一個公式，把整個頂面一次轉成黃色。' };
+      }
+    }
+  }
+  return null;
+}
+function solvePLL(cube) {
+  // PLL 跳過：頂層本來就排好，只需（可能）轉一下頂層對齊
+  for (let post = 0; post < 4; post++) {
+    const c = clone(cube); if (post) E.applyMove(c, 'U', post);
+    if (isSolved(c)) return { moves: post ? [{ move: 'U', quarter: post }] : [], label: '（跳過）', desc: '頂層已經排好，' + (post ? '把頂層轉一下對齊就完成。' : '直接完成！') };
+  }
+  for (let pre = 0; pre < 4; pre++) {
+    for (const p of ALGS.PLL) {
+      const c0 = clone(cube);
+      if (pre) E.applyMove(c0, 'U', pre);
+      E.applyMoves(c0, p.alg);
+      for (let post = 0; post < 4; post++) {
+        const c2 = clone(c0);
+        if (post) E.applyMove(c2, 'U', post);
+        if (isSolved(c2)) {
+          const moves = [];
+          if (pre) moves.push({ move: 'U', quarter: pre });
+          moves.push(...E.parseMoves(p.alg));
+          if (post) moves.push({ move: 'U', quarter: post });
+          return { moves, label: p.name + '-perm', desc: '用一個公式，把頂層的角和邊一次排到正確位置。' };
+        }
+      }
+    }
+  }
+  return null;
+}
+// 後備：兩段式（保證能解，供辨識失敗時使用）
+const OLL_EDGE_MACROS = [
+  { name: 'U', str: 'U' }, { name: 'U2', str: 'U2' }, { name: "U'", str: "U'" },
+  { name: 'FRUF', str: "F R U R' U' F'" },
+];
+const OLL_CORNER_MACROS = [
+  { name: 'U', str: 'U' }, { name: 'U2', str: 'U2' }, { name: "U'", str: "U'" },
+  { name: 'Sune', str: "R U R' U R U2 R'" },
+];
+const PLL_MACROS = [
+  { name: 'U', str: 'U' }, { name: 'U2', str: 'U2' }, { name: "U'", str: "U'" },
+  { name: 'CornerCycle', str: "R' F R' B2 R F' R' B2 R2" },
+  { name: 'EdgeCycle', str: "R U' R U R U R U' R' U' R2" },
+];
+function twoLookOLL(cube) {
+  const out = [];
+  for (const [macros, goal, d] of [[OLL_EDGE_MACROS, yellowEdgesOriented, 10], [OLL_CORNER_MACROS, allYellowUp, 12]]) {
+    const path = macroBFS(cube, macros, goal, d);
+    if (path === null) throw new Error('two-look OLL fail');
+    const mvs = expandMacros(path);
+    for (const m of mvs) E.applyMove(cube, m.move, m.quarter);
+    out.push(...mvs);
+  }
+  return out;
+}
+function twoLookPLL(cube) {
+  const path = macroBFS(cube, PLL_MACROS, isSolved, 14);
+  if (path === null) throw new Error('two-look PLL fail');
+  const mvs = expandMacros(path);
+  for (const m of mvs) E.applyMove(cube, m.move, m.quarter);
+  return mvs;
+}
+
+// ---- 公式正規化：把含整體旋轉(x/y/z)但沒還原的公式，自動補上還原旋轉 ----
+const centerKey = (c) => { const fl = E.toFacelets(c); return fl[4] + fl[13] + fl[22] + fl[31] + fl[40] + fl[49]; };
+const ORIENTATIONS = (() => {
+  const solvedKey = centerKey(E.solvedCube());
+  const res = new Map([[solvedKey, '']]);
+  const q = [{ s: '', c: E.solvedCube() }]; let qi = 0;
+  while (qi < q.length) {
+    const cur = q[qi++];
+    for (const r of ['x', 'y', 'z']) {
+      const c2 = clone(cur.c); E.applyMove(c2, r, 1);
+      const k = centerKey(c2);
+      if (!res.has(k)) { const s = (cur.s + ' ' + r).trim(); res.set(k, s); q.push({ s, c: c2 }); }
+    }
+  }
+  return { map: res, solvedKey };
+})();
+function balanceAlg(alg) {
+  const c = E.solvedCube(); E.applyMoves(c, alg);
+  const k = centerKey(c);
+  if (k === ORIENTATIONS.solvedKey) return alg;
+  // 找一個旋轉，套在後面能把中心轉回原位
+  for (const [okey, ostr] of ORIENTATIONS.map) {
+    const c2 = clone(c); if (ostr) E.applyMoves(c2, ostr);
+    if (centerKey(c2) === ORIENTATIONS.solvedKey) return ostr ? (alg + ' ' + ostr) : alg;
+  }
+  return alg;
+}
+(function normalizeAlgs() {
+  for (const o of ALGS.OLL) o.alg = balanceAlg(o.alg);
+  for (const p of ALGS.PLL) p.alg = balanceAlg(p.alg);
+})();
 
 // ---- 頂層 goal 輔助 ----
 function adjacentSidePairsYellow() {
