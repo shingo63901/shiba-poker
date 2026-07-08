@@ -253,6 +253,10 @@
       $('siSay').textContent = s.say + (s.desc ? '　—　' + s.desc : '');
       $('siProg').textContent = `第 ${cur + 1} / ${total} 步`;
     }
+    // 情況小圖示（只在頂層各階段顯示）
+    const sidx = curStageIndex();
+    const dg = (cur >= 0 && cur < total && sidx >= 0 && sidx < STAGE_LIST.length) ? STAGE_LIST[sidx].diagram : '';
+    $('caseDiagram').innerHTML = dg || '';
     // 章節 chips
     const list = $('stagesList'); list.innerHTML = '';
     let acc = 0; const idxStage = curStageIndex();
@@ -366,6 +370,7 @@
         inputRoleStr = v.roleStr; inputUserStr = v.userFac;
         buildSteps(res.stages);
         if (STEPS.length === 0) { setMsg('這個方塊已經是完成狀態了！', 'ok'); return; }
+        computeDiagrams();
         $('tabSolve').disabled = false;
         switchTab('solve');
         goFirst();
@@ -374,6 +379,63 @@
         setMsg('⚠ 這個顏色組合無法還原，可能哪裡貼錯了。請再對照方塊檢查一次。', 'bad');
       }
     }, 30);
+  }
+
+  // ---------- 情況小圖示（OLL 黃/灰、PLL 顏色＋箭頭）----------
+  const DIAG_HEX = { W: '#f6f7fb', Y: '#ffd400', R: '#d92435', O: '#ff6a12', G: '#08a35a', B: '#1667d8' };
+  const DIAG_SPEC = {
+    oll: { kind: 'oll' }, ll1: { kind: 'oll' }, ll2: { kind: 'oll' },
+    pll: { kind: 'pll', arrows: 'both' }, ll3: { kind: 'pll', arrows: 'corners' }, ll4: { kind: 'pll', arrows: 'edges' },
+  };
+  function solvedFromCenters(userFac) {
+    const cIdx = { U: 4, R: 13, F: 22, D: 31, L: 40, B: 49 };
+    let s = '';
+    for (const f of FACE_ORDER) s += userFac[cIdx[f]].repeat(9);
+    return E.fromFacelets(s);
+  }
+  function diagramSVG(model, kind, arrowSet, homePos) {
+    const topC = E.stickerAt(model, [0, 1, 0], [0, 1, 0]);
+    const G = 22, F = 13, T = 9, N = F * 2 + G * 3;
+    const gx = (c) => F + c * G, gy = (r) => F + r * G;
+    const fillOf = (c) => DIAG_HEX[c] || '#333';
+    const rect = (x, y, w, h, fill) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${fill}" stroke="#0a0d16" stroke-width="1.4"/>`;
+    let cells = '', flaps = '', arrows = '';
+    const pieces = model.filter((cu) => cu.pos[1] === 1);
+    for (const cu of pieces) {
+      for (const s of cu.stickers) {
+        const d = s.dir;
+        const fill = kind === 'oll' ? (s.c === topC ? fillOf('Y') : '#2b2f3a') : fillOf(s.c);
+        if (d[1] === 1) cells += rect(gx(cu.pos[0] + 1), gy(cu.pos[2] + 1), G, G, fill);
+        else if (d[2] === -1) flaps += rect(gx(cu.pos[0] + 1), F - T - 2, G, T, fill);
+        else if (d[2] === 1) flaps += rect(gx(cu.pos[0] + 1), F + 3 * G + 2, G, T, fill);
+        else if (d[0] === -1) flaps += rect(F - T - 2, gy(cu.pos[2] + 1), T, G, fill);
+        else if (d[0] === 1) flaps += rect(F + 3 * G + 2, gy(cu.pos[2] + 1), T, G, fill);
+      }
+    }
+    if (kind === 'pll' && homePos) {
+      for (const cu of pieces) {
+        const corner = cu.stickers.length === 3;
+        if (arrowSet === 'corners' && !corner) continue;
+        if (arrowSet === 'edges' && corner) continue;
+        const hp = homePos[cu.stickers.map((s) => s.c).sort().join('')];
+        if (!hp || (hp[0] === cu.pos[0] && hp[2] === cu.pos[2])) continue;
+        const x1 = gx(cu.pos[0] + 1) + G / 2, y1 = gy(cu.pos[2] + 1) + G / 2;
+        const x2 = gx(hp[0] + 1) + G / 2, y2 = gy(hp[2] + 1) + G / 2;
+        arrows += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="2.4" marker-end="url(#ah)"/>`;
+      }
+    }
+    return `<svg viewBox="0 0 ${N} ${N}"><defs><marker id="ah" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="#fff"/></marker></defs>${flaps}${cells}${arrows}</svg>`;
+  }
+  function computeDiagrams() {
+    const solvedUser = solvedFromCenters(inputUserStr);
+    const homePos = {};
+    for (const cu of solvedUser) homePos[cu.stickers.map((s) => s.c).sort().join('')] = cu.pos;
+    let acc = 0;
+    for (const st of STAGE_LIST) {
+      st.startIdx = acc; acc += st.count;
+      const spec = DIAG_SPEC[st.id];
+      st.diagram = spec ? diagramSVG(rebuildTo(st.startIdx), spec.kind, spec.arrows, homePos) : '';
+    }
   }
 
   function renderFullList() {

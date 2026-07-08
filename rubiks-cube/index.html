@@ -95,6 +95,9 @@ header.top p{color:var(--dim);font-size:14px;margin-top:4px}
 .stk[data-c=G]{background:var(--cG)} .stk[data-c=B]{background:var(--cB)}
 
 /* 步驟資訊 */
+#caseDiagram{display:flex;justify-content:center;margin:6px 0 2px}
+#caseDiagram svg{width:118px;height:118px}
+#caseDiagram .cap{font-size:11px;color:var(--dim)}
 .stepinfo{text-align:center;margin:8px 0}
 .stepinfo .stage{color:var(--accent);font-weight:800;font-size:14px}
 .stepinfo .notation{font-size:40px;font-weight:900;font-family:Consolas,monospace;letter-spacing:2px;margin:2px 0}
@@ -178,6 +181,7 @@ footer{color:var(--dim);text-align:center;font-size:12px;margin-top:26px}
       </div>
       <div class="stepinfo">
         <div class="stage" id="siStage">準備開始</div>
+        <div id="caseDiagram"></div>
         <div class="notation" id="siNotation">–</div>
         <div class="say" id="siSay">按「下一步」開始，或按播放讓它自己走。</div>
         <div class="prog" id="siProg"></div>
