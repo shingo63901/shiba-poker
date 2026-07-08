@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>魔術方塊速解教練｜手把手還原</title>
+<meta name="description" content="輸入你打亂的魔術方塊 6 面顏色，系統用新手層先法一步一步教你還原，附 3D 動畫示範。">
+<style>
+:root{
+  --bg:#0f1424; --bg2:#161d33; --panel:#1c2540; --panel2:#232e52;
+  --line:#31406e; --ink:#eaf0ff; --dim:#93a2ce; --accent:#5b8cff; --accent2:#8f6bff;
+  --ok:#37d39a; --warn:#ffb020; --bad:#ff5d6c;
+  --cW:#f6f7fb; --cY:#ffd400; --cR:#d92435; --cO:#ff6a12; --cG:#08a35a; --cB:#1667d8;
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:radial-gradient(1200px 600px at 50% -10%,#22305a 0%,var(--bg) 55%) fixed;
+  color:var(--ink);
+  font-family:'Segoe UI','PingFang TC','Microsoft JhengHei',system-ui,-apple-system,Arial,sans-serif;
+  line-height:1.55; -webkit-text-size-adjust:100%;
+}
+a{color:var(--accent)}
+.wrap{max-width:960px;margin:0 auto;padding:18px 16px 60px}
+header.top{text-align:center;padding:12px 0 6px}
+header.top h1{font-size:26px;font-weight:900;letter-spacing:.5px;
+  background:linear-gradient(90deg,#8fb4ff,#c3a3ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+header.top p{color:var(--dim);font-size:14px;margin-top:4px}
+
+.tabs{display:flex;gap:8px;justify-content:center;margin:16px 0}
+.tab{background:var(--panel);border:1px solid var(--line);color:var(--dim);
+  padding:8px 18px;border-radius:999px;font-weight:700;font-size:14px;cursor:pointer;transition:.15s}
+.tab.active{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;box-shadow:0 6px 18px rgba(91,140,255,.35)}
+.tab:disabled{opacity:.4;cursor:not-allowed}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px;margin:14px 0;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.card h2{font-size:17px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.card h2 .n{display:inline-flex;width:24px;height:24px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:13px;
+  align-items:center;justify-content:center;font-weight:800}
+.muted{color:var(--dim);font-size:13.5px}
+.hidden{display:none!important}
+
+/* 調色盤 */
+.palette{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.sw{width:38px;height:38px;border-radius:10px;border:2px solid rgba(255,255,255,.25);cursor:pointer;position:relative;transition:.12s}
+.sw.sel{outline:3px solid var(--accent);outline-offset:2px;transform:translateY(-2px)}
+.sw[data-c=W]{background:var(--cW)} .sw[data-c=Y]{background:var(--cY)}
+.sw[data-c=R]{background:var(--cR)} .sw[data-c=O]{background:var(--cO)}
+.sw[data-c=G]{background:var(--cG)} .sw[data-c=B]{background:var(--cB)}
+
+/* 展開圖輸入 */
+#net{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;max-width:520px;margin:14px auto;aspect-ratio:4/3}
+.face{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
+.facelabel{grid-column:span 3;text-align:center;font-size:11px;color:var(--dim);margin-bottom:2px}
+.cell{aspect-ratio:1/1;border-radius:5px;border:1.5px solid rgba(0,0,0,.35);cursor:pointer;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);transition:transform .08s}
+.cell:active{transform:scale(.9)}
+.cell[data-c=W]{background:var(--cW)} .cell[data-c=Y]{background:var(--cY)}
+.cell[data-c=R]{background:var(--cR)} .cell[data-c=O]{background:var(--cO)}
+.cell[data-c=G]{background:var(--cG)} .cell[data-c=B]{background:var(--cB)}
+.cell.center{cursor:default;box-shadow:inset 0 0 0 2px rgba(255,255,255,.5)}
+
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:14px}
+.btn{border:none;border-radius:10px;padding:11px 18px;font-size:15px;font-weight:800;cursor:pointer;
+  color:#fff;background:var(--panel2);border:1px solid var(--line);transition:.15s}
+.btn.primary{background:linear-gradient(90deg,var(--accent),var(--accent2));border-color:transparent;box-shadow:0 8px 22px rgba(91,140,255,.35)}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:active{transform:translateY(1px)}
+
+.modebar{display:flex;gap:8px;align-items:stretch;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.modelabel{align-self:center;color:var(--dim);font-size:13px;margin-right:2px}
+.modebtn{display:flex;flex-direction:column;gap:2px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--dim);border-radius:10px;padding:8px 14px;font-size:14px;font-weight:800;cursor:pointer;transition:.15s}
+.modebtn small{font-weight:600;font-size:11px;color:var(--dim);opacity:.85}
+.modebtn.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;box-shadow:0 6px 16px rgba(91,140,255,.3)}
+.modebtn.active small{color:rgba(255,255,255,.9)}
+#msg{margin-top:10px;font-size:14px;text-align:center;min-height:20px}
+#msg.ok{color:var(--ok)} #msg.bad{color:var(--bad)} #msg.warn{color:var(--warn)}
+
+/* 3D 舞台 */
+.stage-wrap{display:flex;flex-direction:column;align-items:center}
+#scene{width:280px;height:280px;perspective:900px;margin:6px auto 2px;touch-action:none}
+#cube{width:100%;height:100%;position:relative;transform-style:preserve-3d;
+  transform:rotateX(-27deg) rotateY(-32deg);transition:transform .1s linear}
+.cubie{position:absolute;top:50%;left:50%;transform-style:preserve-3d}
+.pivot{position:absolute;top:50%;left:50%;transform-style:preserve-3d;transition:transform .01s linear}
+.stk{position:absolute;border-radius:6px;border:2px solid #05070d;
+  box-shadow:inset 0 0 6px rgba(0,0,0,.35)}
+.stk[data-c=W]{background:var(--cW)} .stk[data-c=Y]{background:var(--cY)}
+.stk[data-c=R]{background:var(--cR)} .stk[data-c=O]{background:var(--cO)}
+.stk[data-c=G]{background:var(--cG)} .stk[data-c=B]{background:var(--cB)}
+
+/* 步驟資訊 */
+#caseDiagram{display:flex;justify-content:center;margin:6px 0 2px}
+#caseDiagram svg{width:118px;height:118px}
+#caseDiagram .cap{font-size:11px;color:var(--dim)}
+.stepinfo{text-align:center;margin:8px 0}
+.stepinfo .stage{color:var(--accent);font-weight:800;font-size:14px}
+.stepinfo .notation{font-size:40px;font-weight:900;font-family:Consolas,monospace;letter-spacing:2px;margin:2px 0}
+.stepinfo .say{font-size:15px;color:var(--ink)}
+.stepinfo .prog{color:var(--dim);font-size:13px;margin-top:2px}
+.controls{display:flex;gap:8px;justify-content:center;align-items:center;margin:10px 0 2px;flex-wrap:wrap}
+.ctl{width:46px;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);
+  color:#fff;font-size:18px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.ctl.big{width:auto;padding:0 18px;font-weight:800;font-size:15px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-color:transparent}
+.ctl:disabled{opacity:.4;cursor:not-allowed}
+
+.stages-list{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
+.chip{font-size:12px;padding:5px 10px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--dim)}
+.chip.done{color:var(--ok);border-color:var(--ok)}
+.chip.cur{color:#fff;background:linear-gradient(90deg,var(--accent),var(--accent2));border-color:transparent}
+
+.legend{font-size:12.5px;color:var(--dim);margin-top:10px;line-height:1.9}
+.legend code{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--ink);font-weight:700}
+details{margin-top:10px}
+summary{cursor:pointer;color:var(--accent);font-weight:700;font-size:14px}
+.speed{display:flex;gap:6px;align-items:center;justify-content:center;color:var(--dim);font-size:13px;margin-top:6px}
+.speed input{accent-color:var(--accent)}
+footer{color:var(--dim);text-align:center;font-size:12px;margin-top:26px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>🧩 魔術方塊速解教練</h1>
+    <p>輸入你打亂後的 6 面顏色，用速解玩家的 <b>CFOP</b> 四步驟（Cross→F2L→OLL→PLL）手把手教你，附 3D 動畫。</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" id="tabInput">① 輸入方塊</button>
+    <button class="tab" id="tabSolve" disabled>② 看解法</button>
+  </div>
+
+  <!-- ================= 輸入頁 ================= -->
+  <section id="pageInput">
+    <div class="card">
+      <h2><span class="n">i</span>怎麼拍照 / 對照輸入</h2>
+      <p class="muted">
+        1）先拿好你的方塊，<b>不要轉動它</b>。<br>
+        2）依照下面展開圖的擺法，把每一面的 9 個小方塊顏色，對照你手上的方塊點進去。<br>
+        3）中心塊的顏色決定每一面「本來的顏色」，可以直接沿用預設。只要把被打亂的格子改成正確顏色即可。<br>
+        <span style="color:var(--warn)">建議擺法（和教學一致）：<b>黃色朝上（U）、白色朝下（D）</b>、綠色朝前（F）。四周中間列由左到右為 左(L/橘) 前(F/綠) 右(R/紅) 後(B/藍)。若你的方塊顏色配置不同也沒關係，系統會自動判斷。</span>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2><span class="n">1</span>選顏色，再點格子上色</h2>
+      <div class="palette" id="palette">
+        <div class="sw sel" data-c="W" title="白"></div>
+        <div class="sw" data-c="Y" title="黃"></div>
+        <div class="sw" data-c="R" title="紅"></div>
+        <div class="sw" data-c="O" title="橘"></div>
+        <div class="sw" data-c="G" title="綠"></div>
+        <div class="sw" data-c="B" title="藍"></div>
+      </div>
+      <div id="net"></div>
+      <div class="modebar">
+        <span class="modelabel">教學方式</span>
+        <button class="modebtn active" data-mode="cfop">完整 CFOP<small>一步到位 · 57＋21 式</small></button>
+        <button class="modebtn" data-mode="4lll">4LLL 新手<small>頂層分四步 · 約 15 式</small></button>
+      </div>
+      <div class="btnrow">
+        <button class="btn primary" id="btnSolve">🔍 驗證並產生解法</button>
+        <button class="btn" id="btnDemo">🎲 填入示範打亂</button>
+        <button class="btn ghost" id="btnReset">↺ 還原成完成狀態</button>
+      </div>
+      <div id="msg"></div>
+    </div>
+  </section>
+
+  <!-- ================= 解法頁 ================= -->
+  <section id="pageSolve" class="hidden">
+    <div class="card stage-wrap">
+      <div id="scene"><div id="cube"></div></div>
+      <div class="speed">拖曳方塊可轉視角 ·
+        速度 <input type="range" id="speed" min="1" max="10" value="6">
+      </div>
+      <div class="stepinfo">
+        <div class="stage" id="siStage">準備開始</div>
+        <div id="caseDiagram"></div>
+        <div class="notation" id="siNotation">–</div>
+        <div class="say" id="siSay">按「下一步」開始，或按播放讓它自己走。</div>
+        <div class="prog" id="siProg"></div>
+      </div>
+      <div class="controls">
+        <button class="ctl" id="cFirst" title="回到開始">⏮</button>
+        <button class="ctl" id="cPrev" title="上一步">◀</button>
+        <button class="ctl big" id="cPlay">▶ 播放</button>
+        <button class="ctl" id="cNext" title="下一步">▶</button>
+        <button class="ctl" id="cLast" title="直接看完成">⏭</button>
+      </div>
+      <div class="stages-list" id="stagesList"></div>
+      <div class="legend">
+        <b>轉法看不懂？</b> 沒符號＝<b>順時針</b>；加 <code>'</code>＝<b>逆時針</b>；加 <code>2</code>＝轉 <b>180°</b>（都以面對那一面看）<br>
+        <b>單層</b>：<code>U</code>上 <code>D</code>下 <code>R</code>右 <code>L</code>左 <code>F</code>前 <code>B</code>後　·
+        <b>兩層(小寫)</b>：<code>r</code>右兩層 <code>l</code>左兩層 <code>u</code>上兩層 <code>f</code>前兩層　·
+        <b>中間層</b>：<code>M</code>(跟左) <code>E</code>(跟下) <code>S</code>(跟前)　·
+        <b>整顆翻</b>：<code>x</code>(跟右) <code>y</code>(跟上) <code>z</code>(跟前)
+      </div>
+      <details>
+        <summary>顯示完整步驟清單</summary>
+        <div id="fullList" class="legend"></div>
+      </details>
+      <div class="btnrow">
+        <button class="btn ghost" id="btnBack">← 回去改輸入</button>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    CFOP 速解法（Cross · F2L · OLL 57 式 · PLL 21 式）· 白底朝下、黃頂收尾 · 全程離線在你的瀏覽器計算 ·
+    <a href="./README.md">說明</a>
+  </footer>
+</div>
+
+<script src="./js/cube.js"></script>
+<script src="./js/algs.js"></script>
+<script src="./js/solver.js"></script>
+<script src="./js/app.js"></script>
+</body>
+</html>
