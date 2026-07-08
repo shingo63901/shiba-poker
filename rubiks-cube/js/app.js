@@ -232,7 +232,12 @@
     for (let i = 0; i < n; i++) E.applyMove(m, STEPS[i].token, STEPS[i].quarter);
     return m;
   }
-  function speedMs() { const v = +$('speed').value; return Math.round(560 - v * 46); }
+  // 播放速度＝倍數（越大越快）。基準 1× ≈ 每步 600ms
+  const SPEEDS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
+  const speedMult = () => SPEEDS[+$('speed').value] || 1;
+  function speedMs() { return Math.round(600 / speedMult()); }        // 單步動畫時間
+  function gapMs() { return Math.round(220 / speedMult()); }          // 自動播放時每步間隔
+  function updateSpeedLabel() { $('speedLabel').textContent = speedMult() + '×'; }
 
   function updateInfo() {
     const total = STEPS.length;
@@ -271,6 +276,7 @@
     $('cFirst').disabled = cur < 0 || animating;
     $('cNext').disabled = cur >= total || animating;
     $('cLast').disabled = cur >= total || animating;
+    highlightStep();
   }
   function curStageIndex() {
     if (cur < 0) return -1;
@@ -298,7 +304,7 @@
     updateInfo();
     if (playing) {
       if (cur >= STEPS.length) stopPlay();
-      else playTimer = setTimeout(() => doNext(true), 150);
+      else playTimer = setTimeout(() => doNext(true), gapMs());
     }
   }
   function doPrev() {
@@ -310,6 +316,16 @@
   function goFirst() { stopPlay(); cur = -1; liveModel = modelAtStart(); renderCube(liveModel); updateInfo(); }
   function goLast() {
     stopPlay(); cur = STEPS.length; liveModel = rebuildTo(STEPS.length); renderCube(liveModel); updateInfo();
+  }
+  // 點某一步：跳到那一步的前一刻，然後把「那一步」動畫示範出來
+  function jumpAndPlay(i) {
+    if (animating || i < 0 || i >= STEPS.length) return;
+    stopPlay();
+    liveModel = rebuildTo(i);       // 該步之前的狀態
+    renderCube(liveModel);
+    cur = i; animating = true; updateInfo();
+    animateMove(liveModel, STEPS[i], speedMs());
+    setTimeout(() => { animating = false; updateInfo(); }, speedMs() + 40);
   }
   function togglePlay() {
     if (playing) { stopPlay(); return; }
@@ -324,6 +340,12 @@
   $('cFirst').onclick = goFirst;
   $('cLast').onclick = goLast;
   $('cPlay').onclick = togglePlay;
+  $('speed').addEventListener('input', updateSpeedLabel);
+  // 點步驟清單裡的任一步 → 示範那一步
+  $('stepList').addEventListener('click', (e) => {
+    const p = e.target.closest('.steppill'); if (!p) return;
+    jumpAndPlay(+p.dataset.idx);
+  });
 
   $('btnDemo').onclick = () => {
     const scr = randomScramble(22);
@@ -374,7 +396,7 @@
         $('tabSolve').disabled = false;
         switchTab('solve');
         goFirst();
-        renderFullList();
+        renderStepList();
       } catch (err) {
         setMsg('⚠ 這個顏色組合無法還原，可能哪裡貼錯了。請再對照方塊檢查一次。', 'bad');
       }
@@ -438,14 +460,27 @@
     }
   }
 
-  function renderFullList() {
-    const el = $('fullList');
-    let html = ''; let stageName = '';
+  function renderStepList() {
+    const el = $('stepList');
+    let html = ''; let stageName = null;
     STEPS.forEach((s, i) => {
-      if (s.stageTitle !== stageName) { stageName = s.stageTitle; html += `<div style="margin-top:6px;color:var(--accent);font-weight:700">${stageName}</div>`; }
-      html += `<code>${s.notation}</code> `;
+      if (s.stageTitle !== stageName) {
+        if (stageName !== null) html += '</div>';
+        stageName = s.stageTitle;
+        html += `<div class="stephead">${(s.stepTag ? s.stepTag.split('·').pop().trim() + '｜' : '') + s.stageTitle}</div><div class="steprow">`;
+      }
+      html += `<span class="steppill" data-idx="${i}" title="${s.say}">${s.notation}</span>`;
     });
+    if (stageName !== null) html += '</div>';
     el.innerHTML = html;
+  }
+  function highlightStep() {
+    const el = $('stepList'); if (!el) return;
+    const prev = el.querySelector('.steppill.cur'); if (prev) prev.classList.remove('cur');
+    if (cur >= 0 && cur < STEPS.length) {
+      const p = el.querySelector(`.steppill[data-idx="${cur}"]`);
+      if (p) { p.classList.add('cur'); p.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+    }
   }
 
   function switchTab(which) {
@@ -475,6 +510,7 @@
 
   // ---------- 初始化 ----------
   buildNet();
+  updateSpeedLabel();
   // 預覽用：解法頁一開始顯示打亂樣子由 solveNow 帶入
   window.__RC = {
     validate, faceletsFromNet, loadFacelets, solveNow, get STEPS() { return STEPS; },

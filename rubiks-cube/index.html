@@ -120,6 +120,19 @@ details{margin-top:10px}
 summary{cursor:pointer;color:var(--accent);font-weight:700;font-size:14px}
 .speed{display:flex;gap:6px;align-items:center;justify-content:center;color:var(--dim);font-size:13px;margin-top:6px}
 .speed input{accent-color:var(--accent)}
+#speedLabel{font-weight:800;color:var(--ink);font-family:Consolas,monospace;min-width:34px;text-align:left}
+
+/* 逐步清單 */
+.steplistwrap{margin-top:14px}
+.sllabel{font-size:12.5px;color:var(--dim);margin-bottom:6px;line-height:1.6}
+#stepList{max-height:190px;overflow:auto;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:8px}
+.stephead{font-size:12px;font-weight:800;color:var(--accent);margin:8px 2px 4px}
+.stephead:first-child{margin-top:0}
+.steprow{display:flex;flex-wrap:wrap;gap:5px}
+.steppill{font-family:Consolas,monospace;font-weight:800;font-size:14px;color:var(--ink);
+  background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:4px 9px;cursor:pointer;transition:.12s}
+.steppill:hover{border-color:var(--accent);transform:translateY(-1px)}
+.steppill.cur{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent}
 footer{color:var(--dim);text-align:center;font-size:12px;margin-top:26px}
 </style>
 </head>
@@ -177,7 +190,8 @@ footer{color:var(--dim);text-align:center;font-size:12px;margin-top:26px}
     <div class="card stage-wrap">
       <div id="scene"><div id="cube"></div></div>
       <div class="speed">拖曳方塊可轉視角 ·
-        速度 <input type="range" id="speed" min="1" max="10" value="6">
+        速度 <input type="range" id="speed" min="0" max="7" value="3">
+        <span id="speedLabel">1×</span>
       </div>
       <div class="stepinfo">
         <div class="stage" id="siStage">準備開始</div>
@@ -201,10 +215,10 @@ footer{color:var(--dim);text-align:center;font-size:12px;margin-top:26px}
         <b>中間層</b>：<code>M</code>(跟左) <code>E</code>(跟下) <code>S</code>(跟前)　·
         <b>整顆翻</b>：<code>x</code>(跟右) <code>y</code>(跟上) <code>z</code>(跟前)
       </div>
-      <details>
-        <summary>顯示完整步驟清單</summary>
-        <div id="fullList" class="legend"></div>
-      </details>
+      <div class="steplistwrap">
+        <div class="sllabel">📋 逐步清單 — <b>點任何一步</b>，方塊就跳到那一刻並示範那個動作（適合一層一層慢慢學）</div>
+        <div id="stepList"></div>
+      </div>
       <div class="btnrow">
         <button class="btn ghost" id="btnBack">← 回去改輸入</button>
       </div>
