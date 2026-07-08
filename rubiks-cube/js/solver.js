@@ -340,8 +340,9 @@ function macroBFS(cube, macros, isGoal, maxDepth = 9) {
 // ==========================================================================
 // 主求解
 // ==========================================================================
-function solve(scrambleFaceletsCubeOrMoves) {
-  // 接受 cube 物件
+function solve(scrambleFaceletsCubeOrMoves, mode) {
+  // mode：'cfop'（一步到位，預設）或 '4lll'（新手四段式）
+  mode = mode || 'cfop';
   const cube = clone(scrambleFaceletsCubeOrMoves);
   const stages = []; // {id,title,moves:[{face,quarter}], desc}
 
@@ -383,30 +384,137 @@ function solve(scrambleFaceletsCubeOrMoves) {
     locked.push(slot.c, slot.e);
   }
 
-  // ---- 4. OLL：一個公式把整個頂面轉成黃色 ----
-  {
-    const r = solveOLL(cube);
-    if (r) { applyStep(r.moves); record('oll', 'OLL ' + r.label, r.moves, r.desc, true); }
-    else {
-      fallbacks.oll = true; fallbacks.ollState = E.toFacelets(cube);
-      const mvs = twoLookOLL(cube);
-      record('oll', '頂面轉正（兩段式）', mvs, '先做黃十字，再把黃角轉正', true);
+  if (mode === '4lll') {
+    // ====== 4LLL：頂層分四步，只用約 15 條核心公式 ======
+    const r1 = llCross(cube); if (!r1) throw new Error('4LLL cross null'); applyStep(r1.moves);
+    record('ll1', 'OLL① 黃十字 · ' + r1.label, r1.moves, r1.desc, true);
+    const r2 = llOCLL(cube); if (!r2) throw new Error('4LLL OCLL null'); applyStep(r2.moves);
+    record('ll2', 'OLL② 翻黃角 · ' + r2.label, r2.moves, r2.desc, true);
+    const r3 = llCorners(cube); if (!r3) throw new Error('4LLL corners null'); applyStep(r3.moves);
+    record('ll3', 'PLL① 角歸位 · ' + r3.label, r3.moves, r3.desc, true);
+    const r4 = llEdges(cube); if (!r4) throw new Error('4LLL edges null'); applyStep(r4.moves);
+    record('ll4', 'PLL② 邊歸位 · ' + r4.label, r4.moves, r4.desc, true);
+  } else {
+    // ====== 完整 CFOP：OLL 一步、PLL 一步 ======
+    {
+      const r = solveOLL(cube);
+      if (r) { applyStep(r.moves); record('oll', 'OLL ' + r.label, r.moves, r.desc, true); }
+      else {
+        fallbacks.oll = true; fallbacks.ollState = E.toFacelets(cube);
+        const mvs = twoLookOLL(cube);
+        record('oll', '頂面轉正（兩段式）', mvs, '先做黃十字，再把黃角轉正', true);
+      }
     }
-  }
-
-  // ---- 5. PLL：一個公式把頂層排到正確位置 ----
-  {
-    const r = solvePLL(cube);
-    if (r) { applyStep(r.moves); record('pll', 'PLL ' + r.label, r.moves, r.desc, true); }
-    else {
-      fallbacks.pll = true; fallbacks.pllState = E.toFacelets(cube);
-      const mvs = twoLookPLL(cube);
-      record('pll', '頂層排列（兩段式）', mvs, '先排角、再排邊', true);
+    {
+      const r = solvePLL(cube);
+      if (r) { applyStep(r.moves); record('pll', 'PLL ' + r.label, r.moves, r.desc, true); }
+      else {
+        fallbacks.pll = true; fallbacks.pllState = E.toFacelets(cube);
+        const mvs = twoLookPLL(cube);
+        record('pll', '頂層排列（兩段式）', mvs, '先排角、再排邊', true);
+      }
     }
   }
 
   if (!isSolved(cube)) throw new Error('NOT SOLVED at end');
   return { stages, solvedCheck: isSolved(cube), fallbacks };
+}
+
+// ====== 4LLL 四段式（辨識後套用固定公式）======
+const YEDGES = [[YELLOW, E.SCHEME.F], [YELLOW, E.SCHEME.R], [YELLOW, E.SCHEME.B], [YELLOW, E.SCHEME.L]];
+const YCORNERS = [[YELLOW, E.SCHEME.F, E.SCHEME.R], [YELLOW, E.SCHEME.R, E.SCHEME.B], [YELLOW, E.SCHEME.B, E.SCHEME.L], [YELLOW, E.SCHEME.L, E.SCHEME.F]];
+function cornersSolved(cube) { return YCORNERS.every((c) => pieceSolved(cube, c)); }
+// Look1：黃十字（1 條公式 F R U R' U' F'，依情況擺角度／做兩次）
+function crossCaseName(cube) {
+  const oriented = [];
+  for (const cu of cube) {
+    if (cu.stickers.length !== 2 || cu.pos[1] !== 1) continue;
+    const yl = cu.stickers.find((s) => s.c === YELLOW);
+    if (yl && eq(yl.dir, [0, 1, 0])) oriented.push(cu.pos);
+  }
+  if (oriented.length === 4) return { name: '已完成', kind: 'done' };
+  if (oriented.length === 0) return { name: '點形 (Dot)', kind: 'dot' };
+  // 兩個已翻正：同一軸→一字，不同軸→L 形
+  const axisOf = (p) => (p[0] !== 0 ? 'x' : 'z');
+  const line = axisOf(oriented[0]) === axisOf(oriented[1]);
+  return line ? { name: '一字 (Line)', kind: 'line' } : { name: 'L 形 (L-shape)', kind: 'L' };
+}
+function llCross(cube) {
+  const cc = crossCaseName(cube);
+  if (cc.kind === 'done') return { moves: [], label: '（已是黃十字，跳過）', desc: '頂面已經有黃色十字。' };
+  const macros = [{ str: 'U' }, { str: 'U2' }, { str: "U'" }, { str: "F R U R' U' F'" }];
+  const path = macroBFS(cube, macros, yellowEdgesOriented, 9);
+  if (path === null) throw new Error('4LLL cross fail');
+  return { moves: expandMacros(path), label: cc.name, desc: '用「' + "F R U R' U' F'" + '」做出黃色十字。' };
+}
+// Look2：翻黃角（OCLL 7 式，重用 OLL #21~27）
+function llOCLL(cube) {
+  if (allYellowUp(cube)) return { moves: [], label: '（已全黃，跳過）', desc: '四個角本來就都朝上是黃色。' };
+  const ocll = ALGS.OLL.filter((o) => o.n >= 21 && o.n <= 27);
+  for (let auf = 0; auf < 4; auf++) {
+    for (const o of ocll) {
+      const c = clone(cube);
+      if (auf) E.applyMove(c, 'U', auf);
+      E.applyMoves(c, o.alg);
+      if (allYellowUp(c)) {
+        const moves = [];
+        if (auf) moves.push({ move: 'U', quarter: auf });
+        moves.push(...E.parseMoves(o.alg));
+        return { moves, label: (o.name || '') + '（OLL#' + o.n + '）', desc: '對照頂面黃角形狀，套這條把角轉正。' };
+      }
+    }
+  }
+  return null;
+}
+// Look3：角歸位（有眼睛→T-perm，沒眼睛→Y-perm）
+const T_PERM = "R U R' U' R' F R2 U' R' U' R U R' F'";
+const Y_PERM = "F R U' R' U' R U R' F' R U R' U' R' F R F'";
+function llCorners(cube) {
+  for (let auf = 0; auf < 4; auf++) { // 跳過（角已對齊）
+    const c = clone(cube); if (auf) E.applyMove(c, 'U', auf);
+    if (cornersSolved(c)) return { moves: auf ? [{ move: 'U', quarter: auf }] : [], label: '（角已對齊，跳過）', desc: '四個角已經在正確位置。' };
+  }
+  for (let pre = 0; pre < 4; pre++) {
+    for (const [nm, alg, tip] of [['T-perm', T_PERM, '看到一對同色「眼睛」放左邊，做 T-perm。'], ['Y-perm', Y_PERM, '找不到眼睛（對角互換），做 Y-perm。']]) {
+      const c0 = clone(cube); if (pre) E.applyMove(c0, 'U', pre); E.applyMoves(c0, alg);
+      for (let post = 0; post < 4; post++) {
+        const c2 = clone(c0); if (post) E.applyMove(c2, 'U', post);
+        if (cornersSolved(c2)) {
+          const moves = []; if (pre) moves.push({ move: 'U', quarter: pre });
+          moves.push(...E.parseMoves(alg));
+          if (post) moves.push({ move: 'U', quarter: post });
+          return { moves, label: nm, desc: tip };
+        }
+      }
+    }
+  }
+  return null;
+}
+// Look4：邊歸位（Ua / Ub / H / Z，用 M 軸）
+const EDGE_PERMS = [
+  ['Ua', "M2 U M U2 M' U M2"], ['Ub', "M2 U' M U2 M' U' M2"],
+  ['H', "M2 U M2 U2 M2 U M2"], ['Z', "M2 U M2 U M' U2 M2 U2 M'"],
+];
+function llEdges(cube) {
+  for (let post = 0; post < 4; post++) { // 跳過 / 只需對齊
+    const c = clone(cube); if (post) E.applyMove(c, 'U', post);
+    if (isSolved(c)) return { moves: post ? [{ move: 'U', quarter: post }] : [], label: '（完成）', desc: post ? '把頂層轉一下對齊就完成。' : '直接完成！' };
+  }
+  for (let pre = 0; pre < 4; pre++) {
+    for (const [nm, alg] of EDGE_PERMS) {
+      const c0 = clone(cube); if (pre) E.applyMove(c0, 'U', pre); E.applyMoves(c0, alg);
+      for (let post = 0; post < 4; post++) {
+        const c2 = clone(c0); if (post) E.applyMove(c2, 'U', post);
+        if (isSolved(c2)) {
+          const moves = []; if (pre) moves.push({ move: 'U', quarter: pre });
+          moves.push(...E.parseMoves(alg));
+          if (post) moves.push({ move: 'U', quarter: post });
+          return { moves, label: nm + '-perm', desc: 'H／Z 這類用 M 軸（中層）雙手撥最快。' };
+        }
+      }
+    }
+  }
+  return null;
 }
 
 // ---- CFOP 頂層辨識（套用後驗證，保證正確）----

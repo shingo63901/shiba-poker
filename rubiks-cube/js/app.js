@@ -18,6 +18,7 @@
   const net = {};
   FACE_ORDER.forEach((f) => { net[f] = Array(9).fill(DEFAULT_CENTER[f]); });
   let selColor = 'W';
+  let mode = 'cfop';
 
   // ---------- 建立展開圖 ----------
   const netEl = $('net');
@@ -52,6 +53,12 @@
     const sw = e.target.closest('.sw'); if (!sw) return;
     selColor = sw.dataset.c;
     document.querySelectorAll('.sw').forEach((s) => s.classList.toggle('sel', s === sw));
+  });
+  // 教學模式切換
+  document.querySelector('.modebar').addEventListener('click', (e) => {
+    const b = e.target.closest('.modebtn'); if (!b) return;
+    mode = b.dataset.mode;
+    document.querySelectorAll('.modebtn').forEach((x) => x.classList.toggle('active', x === b));
   });
 
   function faceletsFromNet() {
@@ -106,7 +113,10 @@
   let inputRoleStr = null, inputUserStr = null;
 
   // CFOP 四大階段的號碼與說明
-  const STAGE_STEP = { cross: '第 1 步 · Cross', f2l: '第 2 步 · F2L', oll: '第 3 步 · OLL', pll: '第 4 步 · PLL' };
+  const STAGE_STEP = {
+    cross: '第 1 步 · Cross', f2l: '第 2 步 · F2L', oll: '第 3 步 · OLL', pll: '第 4 步 · PLL',
+    ll1: '第 3 步 · OLL', ll2: '第 3 步 · OLL', ll3: '第 4 步 · PLL', ll4: '第 4 步 · PLL',
+  };
 
   // 各種轉法的中文說明
   const TURN_CN = {
@@ -351,7 +361,7 @@
     setTimeout(() => {
       try {
         const roleModel = E.fromFacelets(v.roleStr);
-        const res = S.solve(roleModel);
+        const res = S.solve(roleModel, mode);
         if (!res.solvedCheck) throw new Error('unsolved');
         inputRoleStr = v.roleStr; inputUserStr = v.userFac;
         buildSteps(res.stages);
