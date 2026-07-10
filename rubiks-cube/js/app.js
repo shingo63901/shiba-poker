@@ -224,7 +224,12 @@
 
   // ---------- 播放控制 ----------
   let cur = -1;            // 目前已完成到第幾步（-1 = 尚未開始，顯示打亂原狀）
-  let playing = false, playTimer = null, animating = false;
+  let playing = false, playTimer = null, animating = false, animTimer = null;
+  // 立即取消任何進行中的動畫，讓下一個動作馬上生效（不讓點擊被吃掉）
+  function cancelAnimation() {
+    if (animTimer) { clearTimeout(animTimer); animTimer = null; }
+    if (animating) { animating = false; renderCube(liveModel); } // renderCube 會清掉殘留的 .pivot
+  }
 
   function modelAtStart() { return E.fromFacelets(inputUserStr); }
   function rebuildTo(n) {  // 直接重算到第 n 步（不動畫）
@@ -287,15 +292,16 @@
   }
 
   function doNext(animate) {
+    cancelAnimation();
     const nextIdx = cur + 1;
-    if (animating || nextIdx >= STEPS.length + 0 && cur >= STEPS.length) { stopPlay(); return; }
+    if (cur >= STEPS.length) { stopPlay(); return; }
     const mv = STEPS[nextIdx];
     if (!mv) { cur = STEPS.length; updateInfo(); stopPlay(); return; }
     cur = nextIdx;
     if (animate) {
       animating = true; updateInfo();
       animateMove(liveModel, mv, speedMs());
-      setTimeout(() => { animating = false; afterStep(); }, speedMs() + 40);
+      animTimer = setTimeout(() => { animating = false; animTimer = null; afterStep(); }, speedMs() + 40);
     } else {
       E.applyMove(liveModel, mv.token, mv.quarter); renderCube(liveModel); afterStep();
     }
@@ -308,24 +314,27 @@
     }
   }
   function doPrev() {
-    if (animating || cur < 0) return;
+    cancelAnimation();
+    if (cur < 0) return;
     cur -= 1;                       // cur 表示「已完成到第幾步（0-based）」
     liveModel = rebuildTo(cur + 1); // 重算到該狀態
     renderCube(liveModel); updateInfo();
   }
-  function goFirst() { stopPlay(); cur = -1; liveModel = modelAtStart(); renderCube(liveModel); updateInfo(); }
+  function goFirst() { stopPlay(); cancelAnimation(); cur = -1; liveModel = modelAtStart(); renderCube(liveModel); updateInfo(); }
   function goLast() {
-    stopPlay(); cur = STEPS.length; liveModel = rebuildTo(STEPS.length); renderCube(liveModel); updateInfo();
+    stopPlay(); cancelAnimation();
+    cur = STEPS.length; liveModel = rebuildTo(STEPS.length); renderCube(liveModel); updateInfo();
   }
   // 點某一步：跳到那一步的前一刻，然後把「那一步」動畫示範出來
+  // 一定會立刻回應（就算前一個動畫還沒播完），方便連續點不同步驟重複觀看
   function jumpAndPlay(i) {
-    if (animating || i < 0 || i >= STEPS.length) return;
-    stopPlay();
+    if (i < 0 || i >= STEPS.length) return;
+    stopPlay(); cancelAnimation();
     liveModel = rebuildTo(i);       // 該步之前的狀態
     renderCube(liveModel);
     cur = i; animating = true; updateInfo();
     animateMove(liveModel, STEPS[i], speedMs());
-    setTimeout(() => { animating = false; updateInfo(); }, speedMs() + 40);
+    animTimer = setTimeout(() => { animating = false; animTimer = null; updateInfo(); }, speedMs() + 40);
   }
   function togglePlay() {
     if (playing) { stopPlay(); return; }
