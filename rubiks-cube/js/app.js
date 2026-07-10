@@ -479,7 +479,13 @@
     const prev = el.querySelector('.steppill.cur'); if (prev) prev.classList.remove('cur');
     if (cur >= 0 && cur < STEPS.length) {
       const p = el.querySelector(`.steppill[data-idx="${cur}"]`);
-      if (p) { p.classList.add('cur'); p.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+      if (p) {
+        p.classList.add('cur');
+        // 只捲動清單自己的內部捲軸，絕不捲動整個頁面
+        // （scrollIntoView 在手機 Safari 會連頁面一起捲，造成畫面被強制拉走）
+        const target = p.offsetTop - el.clientHeight / 2 + p.offsetHeight / 2;
+        el.scrollTop = Math.max(0, target);
+      }
     }
   }
 
