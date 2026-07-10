@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>製程改善統計檢定工具</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --ink:#1f2937; --muted:#6b7280;
+    --accent:#2563eb; --accent-soft:#dbeafe; --border:#e5e7eb;
+    --ok:#047857; --ok-soft:#d1fae5; --ng:#6b7280; --ng-soft:#f3f4f6;
+    --warn:#b45309; --warn-soft:#fef3c7;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:"Segoe UI","Microsoft JhengHei","PingFang TC",sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.65; padding-bottom:60px;}
+  header{background:linear-gradient(135deg,#1e3a8a,#2563eb); color:#fff; padding:22px 16px; text-align:center;}
+  header h1{font-size:1.45rem; letter-spacing:.05em;}
+  header p{opacity:.85; font-size:.9rem; margin-top:4px;}
+  .tabs{display:flex; flex-wrap:wrap; gap:6px; justify-content:center;
+    padding:12px 10px; background:#fff; border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:10;}
+  .tabs button{border:1px solid var(--border); background:#fff; color:var(--ink);
+    padding:7px 13px; border-radius:20px; cursor:pointer; font-size:.88rem;
+    transition:.15s;}
+  .tabs button:hover{border-color:var(--accent); color:var(--accent);}
+  .tabs button.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  main{max-width:960px; margin:0 auto; padding:18px 14px;}
+  section.panel{display:none;}
+  section.panel.active{display:block;}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:18px 20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  .card h2{font-size:1.15rem; color:#1e3a8a; margin-bottom:10px;}
+  .card h3{font-size:1rem; color:#1e3a8a; margin:14px 0 6px;}
+  details.note{background:#f8fafc; border:1px solid var(--border); border-radius:10px;
+    padding:12px 16px; margin-bottom:16px;}
+  details.note summary{cursor:pointer; font-weight:700; color:#1e3a8a; font-size:1rem;}
+  details.note h4{margin:12px 0 4px; font-size:.95rem; color:#374151;}
+  details.note ul,details.note ol{padding-left:22px; margin:4px 0;}
+  details.note li{margin:3px 0; font-size:.92rem;}
+  details.note p{font-size:.92rem; margin:4px 0;}
+  .formula{background:#eef2ff; border-radius:8px; padding:8px 12px; margin:6px 0;
+    font-family:"Cambria Math",Georgia,serif; font-size:.95rem; overflow-x:auto;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr;}}
+  label.fld{display:block; font-size:.88rem; font-weight:600; color:#374151; margin:10px 0 4px;}
+  textarea{width:100%; min-height:110px; border:1px solid var(--border); border-radius:8px;
+    padding:10px; font-family:Consolas,Menlo,monospace; font-size:.9rem; resize:vertical;}
+  textarea:focus,input:focus,select:focus{outline:2px solid var(--accent-soft); border-color:var(--accent);}
+  input[type=number],select{border:1px solid var(--border); border-radius:8px; padding:7px 10px; font-size:.9rem;}
+  .controls{display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; margin-top:12px;}
+  .controls .ctl{display:flex; flex-direction:column; gap:4px; font-size:.85rem; color:#374151;}
+  .btnrow{display:flex; flex-wrap:wrap; gap:10px; margin-top:14px;}
+  button.run{background:var(--accent); color:#fff; border:none; border-radius:8px;
+    padding:10px 22px; font-size:.95rem; font-weight:700; cursor:pointer;}
+  button.run:hover{background:#1d4ed8;}
+  button.demo{background:#fff; color:var(--accent); border:1px solid var(--accent);
+    border-radius:8px; padding:10px 16px; font-size:.9rem; cursor:pointer;}
+  button.demo:hover{background:var(--accent-soft);}
+  .result{margin-top:16px;}
+  table.res{border-collapse:collapse; width:100%; font-size:.88rem; margin:8px 0;}
+  table.res th,table.res td{border:1px solid var(--border); padding:6px 10px; text-align:right;}
+  table.res th{background:#f1f5f9; text-align:center; font-weight:600;}
+  table.res td:first-child{text-align:left; font-weight:600; background:#fafafa;}
+  .tablewrap{overflow-x:auto;}
+  .verdict{border-radius:10px; padding:12px 16px; margin-top:12px; font-size:.95rem;}
+  .verdict.sig{background:var(--ok-soft); color:var(--ok); border:1px solid #a7f3d0;}
+  .verdict.ns{background:var(--ng-soft); color:#374151; border:1px solid var(--border);}
+  .verdict b{font-size:1.02rem;}
+  .warnbox{background:var(--warn-soft); color:var(--warn); border:1px solid #fde68a;
+    border-radius:10px; padding:10px 14px; margin-top:10px; font-size:.88rem;}
+  .errbox{background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;
+    border-radius:10px; padding:10px 14px; margin-top:12px; font-size:.9rem;}
+  .flow{background:#f8fafc; border:1px solid var(--border); border-radius:10px;
+    padding:14px 18px; font-size:.93rem;}
+  .flow .q{font-weight:700; color:#1e3a8a; margin-top:10px;}
+  .flow .a{padding-left:18px;}
+  .badge{display:inline-block; background:var(--accent-soft); color:#1d4ed8;
+    border-radius:6px; padding:1px 8px; font-size:.8rem; font-weight:700; margin-right:6px;}
+  .hint{font-size:.82rem; color:var(--muted); margin-top:3px;}
+  footer{text-align:center; color:var(--muted); font-size:.8rem; margin-top:30px;}
+  .cmp{width:100%; border-collapse:collapse; font-size:.88rem;}
+  .cmp th,.cmp td{border:1px solid var(--border); padding:7px 10px; text-align:left;}
+  .cmp th{background:#f1f5f9;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📊 製程改善統計檢定工具</h1>
+  <p>對照 Excel「資料分析」工具箱｜F 檢定・t 檢定・卡方檢定・變異數分析（ANOVA）</p>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="guide" class="active">🧭 檢定選擇指引</button>
+  <button data-tab="ftest">F 檢定</button>
+  <button data-tab="tpaired">t 檢定：成對</button>
+  <button data-tab="tequal">t 檢定：等變異</button>
+  <button data-tab="twelch">t 檢定：不等變異</button>
+  <button data-tab="chisq">卡方檢定</button>
+  <button data-tab="anova1">單因子 ANOVA</button>
+  <button data-tab="anova2">雙因子 ANOVA</button>
+</nav>
+
+<main>
+
+<!-- ═══════════════ 指引 ═══════════════ -->
+<section class="panel active" id="panel-guide">
+  <div class="card">
+    <h2>如何選擇正確的檢定？</h2>
+    <p>驗證製程改善是否有效，本質上是問：「改善前後的差異，是真實效果還是隨機波動？」
+       假設檢定用資料回答這個問題。請先依照資料型態與比較目的選擇檢定：</p>
+    <div class="flow" style="margin-top:12px">
+      <div class="q">Q1. 你的資料是「連續數值」（尺寸、良率、時間、強度…）還是「類別計數」（缺陷類型件數、不良/良品數…）？</div>
+      <div class="a">→ 類別計數：使用 <span class="badge">卡方檢定</span>（分布是否改變、兩類別變數是否相關）</div>
+      <div class="a">→ 連續數值：往 Q2</div>
+      <div class="q">Q2. 你想比較的是「平均值」還是「變異（穩定度）」？</div>
+      <div class="a">→ 變異：使用 <span class="badge">F 檢定</span>（改善後製程是否更穩定）</div>
+      <div class="a">→ 平均值：往 Q3</div>
+      <div class="q">Q3. 要比較幾組？</div>
+      <div class="a">→ 兩組，且是「同一批對象」改善前後各量一次：<span class="badge">成對 t 檢定</span></div>
+      <div class="a">→ 兩組，且是「兩批獨立樣本」：先做 F 檢定判斷變異數是否相等 →
+        相等用 <span class="badge">等變異 t 檢定</span>，不相等用 <span class="badge">不等變異 t 檢定（Welch）</span></div>
+      <div class="a">→ 三組以上（多個參數水準、多台機、多供應商）：<span class="badge">單因子 ANOVA</span></div>
+      <div class="a">→ 同時考慮兩個因子（如溫度 × 壓力）：<span class="badge">雙因子 ANOVA</span></div>
+    </div>
+
+    <h3>與 Excel「資料分析」工具箱的對照</h3>
+    <div class="tablewrap">
+    <table class="cmp">
+      <tr><th>Excel 資料分析項目</th><th>本工具分頁</th><th>典型製程情境</th></tr>
+      <tr><td>F 檢定：兩個常態母體變異數的檢定</td><td>F 檢定</td><td>改善後尺寸變異是否縮小（製程更穩定）</td></tr>
+      <tr><td>t 檢定：成對母體平均數差異檢定</td><td>t 檢定：成對</td><td>同 10 台設備調機前後的節拍時間</td></tr>
+      <tr><td>t 檢定：兩個母體平均數差的檢定（假設變異數相等）</td><td>t 檢定：等變異</td><td>新舊治具各生產一批，比較平均良率</td></tr>
+      <tr><td>t 檢定：兩個母體平均數差的檢定（假設變異數不相等）</td><td>t 檢定：不等變異</td><td>同上，但 F 檢定顯示兩批變異不同</td></tr>
+      <tr><td>（Excel 以 CHISQ.TEST 函數提供）</td><td>卡方檢定</td><td>改善後缺陷類型分布是否改變；缺陷是否與班別有關</td></tr>
+      <tr><td>單因子變異數分析</td><td>單因子 ANOVA</td><td>三種製程參數水準的平均強度是否有差異</td></tr>
+      <tr><td>雙因子變異數分析：無重複試驗</td><td>雙因子 ANOVA</td><td>操作員 × 機台 各一次量測</td></tr>
+      <tr><td>雙因子變異數分析：重複試驗</td><td>雙因子 ANOVA</td><td>溫度 × 壓力 各組合重複多次，含交互作用</td></tr>
+    </table>
+    </div>
+
+    <h3>假設檢定的基本邏輯（各分頁通用）</h3>
+    <ol style="padding-left:22px; font-size:.93rem">
+      <li><b>設定假設：</b>虛無假設 H₀ 通常是「沒有差異／改善無效」，對立假設 H₁ 是「有差異／改善有效」。</li>
+      <li><b>選定顯著水準 α：</b>常用 0.05，代表容許 5% 的機率「其實沒差異卻誤判有差異」（型一錯誤）。</li>
+      <li><b>計算檢定統計量與 p 值：</b>p 值 = 假設 H₀ 為真時，觀察到目前（或更極端）資料的機率。</li>
+      <li><b>下結論：</b>p &lt; α → 拒絕 H₀，差異「統計上顯著」；p ≥ α → 無法拒絕 H₀，證據不足（不等於證明沒差異）。</li>
+    </ol>
+    <div class="warnbox">⚠ 統計顯著 ≠ 實務重要。p 值很小只代表差異「不是巧合」，改善幅度是否值得投資，仍要看平均差、變異縮小量等實際數字與成本效益。</div>
+  </div>
+</section>
+
+<!-- ═══════════════ F 檢定 ═══════════════ -->
+<section class="panel" id="panel-ftest">
+  <details class="note" open>
+    <summary>📖 檢定說明：F 檢定（兩個常態母體變異數的檢定）</summary>
+    <h4>什麼情形下使用？</h4>
+    <ul>
+      <li>想驗證改善後製程的「變異（穩定度）」是否改變——例如導入自動化後，產品尺寸的散布是否縮小。製程能力（Cpk）的提升往往來自變異縮小，而不只是平均值位移。</li>
+      <li>做「兩獨立樣本 t 檢定」之前的前置判斷：兩組變異數相等 → 用等變異 t 檢定；不相等 → 用不等變異（Welch）t 檢定。</li>
+    </ul>
+    <h4>如何使用？</h4>
+    <ol>
+      <li>改善前、改善後各收集一組<b>獨立</b>樣本（不同批次、不同時間點皆可，但兩組之間不能配對）。</li>
+      <li>計算兩組樣本變異數 s₁²、s₂²，統計量為兩者比值：</li>
+    </ol>
+    <div class="formula">F = s₁² / s₂²　（自由度 df₁ = n₁−1，df₂ = n₂−1）</div>
+    <ol start="3">
+      <li>若兩母體變異數真的相等，F 應接近 1；F 遠大於或遠小於 1 都代表變異數可能不同。</li>
+      <li>比較 p 值與 α：p &lt; α → 兩組變異數顯著不同。</li>
+    </ol>
+    <h4>前提假設與注意事項</h4>
+    <ul>
+      <li>兩組樣本互相獨立，且母體近似常態分布。<b>F 檢定對非常態非常敏感</b>，資料明顯偏態時結論可能失真（可改用 Levene 檢定）。</li>
+      <li>Excel 的「F 檢定」報表只給<b>單尾</b> p 值；若只是想檢驗「變異數是否相等」（不預設方向），應看雙尾 p 值（單尾 × 2）。本工具兩者都提供。</li>
+      <li>製程改善驗證常用單尾：H₁ 設為「改善後變異數 &lt; 改善前」，方向明確時檢定力較高。</li>
+    </ul>
+    <h4>判讀範例</h4>
+    <p>改善前 s² = 0.25、改善後 s² = 0.09，F = 2.78，單尾 p = 0.01 &lt; 0.05 → 改善後變異顯著縮小，製程穩定度提升有統計證據支持。</p>
+  </details>
+
+  <div class="card">
+    <h2>執行 F 檢定</h2>
+    <div class="grid2">
+      <div>
+        <label class="fld">變數 1（例：改善前量測值）</label>
+        <textarea id="f-x1" placeholder="數值以逗號、空白或換行分隔&#10;可直接從 Excel 欄位貼上"></textarea>
+      </div>
+      <div>
+        <label class="fld">變數 2（例：改善後量測值）</label>
+        <textarea id="f-x2"></textarea>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="ctl">顯著水準 α
+        <select id="f-alpha"><option>0.05</option><option>0.01</option><option>0.10</option></select>
+      </div>
+      <div class="ctl">結論依據
+        <select id="f-tail">
+          <option value="2">雙尾（變異數是否不同）</option>
+          <option value="1">單尾（變數1 變異是否較大）</option>
+        </select>
+      </div>
+    </div>
+    <div class="btnrow">
+      <button class="run" onclick="runF()">執行檢定</button>
+      <button class="demo" onclick="demoF()">載入範例：改善前後尺寸變異</button>
+    </div>
+    <div class="result" id="f-out"></div>
+  </div>
+</section>
+
+<!-- ═══════════════ t 成對 ═══════════════ -->
+<section class="panel" id="panel-tpaired">
+  <details class="note" open>
+    <summary>📖 檢定說明：成對 t 檢定（成對母體平均數差異檢定）</summary>
+    <h4>什麼情形下使用？</h4>
+    <ul>
+      <li>「同一批對象」在改善前後<b>各量測一次</b>，資料一一配對：同 10 台設備調機前後的節拍時間、同 12 件樣品改善前後的量測值、同一組作業員訓練前後的產出。</li>
+      <li>優點：把「個體之間的差異」（每台機器本來就快慢不同）從誤差中扣除，只看「改善造成的變化」，靈敏度（檢定力）通常比獨立兩樣本 t 檢定高。</li>
+    </ul>
+    <h4>如何使用？</h4>
+    <ol>
+      <li>確認兩欄資料筆數相同且逐列配對（第 1 筆對第 1 筆…）。</li>
+      <li>計算每一對的差 d = x₁ − x₂，對差值做單樣本 t 檢定：</li>
+    </ol>
+    <div class="formula">t = d̄ / ( s_d / √n )　（自由度 df = n−1）</div>
+    <ol start="3">
+      <li>H₀：平均差 μ_d = 0（改善無效）；H₁：μ_d ≠ 0（雙尾）或 &gt;0 / &lt;0（單尾，方向明確時）。</li>
+      <li>p &lt; α → 改善前後平均有顯著差異。</li>
+    </ol>
+    <h4>前提假設與注意事項</h4>
+    <ul>
+      <li>「差值 d」近似常態分布（樣本數 ≥ 30 時中央極限定理可放寬）。</li>
+      <li>配對必須真實存在——兩批不同的產品不能硬湊成對，那要用獨立兩樣本 t 檢定。</li>
+      <li>若改善方向明確（例如目標是「縮短」時間），用單尾檢定較有力，但方向必須在收資料前決定，不能看完資料再選。</li>
+    </ul>
+    <h4>判讀範例</h4>
+    <p>10 台設備調機後平均節拍縮短 1.8 秒，t = 4.2，雙尾 p = 0.002 &lt; 0.05 → 調機效果顯著。</p>
+  </details>
+
+  <div class="card">
+    <h2>執行成對 t 檢定</h2>
+    <div class="grid2">
+      <div>
+        <label class="fld">變數 1（改善前，與變數 2 逐筆配對）</label>
+        <textarea id="tp-x1"></textarea>
+      </div>
+      <div>
+        <label class="fld">變數 2（改善後）</label>
+        <textarea id="tp-x2"></textarea>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="ctl">顯著水準 α
+        <select id="tp-alpha"><option>0.05</option><option>0.01</option><option>0.10</option></select>
+      </div>
+      <div class="ctl">假設的均數差（H₀）
+        <input type="number" id="tp-d0" value="0" step="any" style="width:90px">
+      </div>
+      <div class="ctl">結論依據
+        <select id="tp-tail">
+          <option value="2">雙尾（前後是否不同）</option>
+          <option value="1">單尾（依差值方向）</option>
+        </select>
+      </div>
+    </div>
+    <div class="btnrow">
+      <button class="run" onclick="runTPaired()">執行檢定</button>
+      <button class="demo" onclick="demoTPaired()">載入範例：10 台設備調機前後節拍</button>
+    </div>
+    <div class="result" id="tp-out"></div>
+  </div>
+</section>
+
+<!-- ═══════════════ t 等變異 ═══════════════ -->
+<section class="panel" id="panel-tequal">
+  <details class="note" open>
+    <summary>📖 檢定說明：兩獨立樣本 t 檢定（假設變異數相等）</summary>
+    <h4>什麼情形下使用？</h4>
+    <ul>
+      <li>比較「兩批獨立樣本」的平均值：改善前抽一批、改善後另抽一批（不是同一批對象量兩次）；或新舊治具、兩家供應商各生產一批。</li>
+      <li>且事先用 <b>F 檢定</b>確認兩組變異數沒有顯著差異（Excel 的標準流程即：先跑 F 檢定，再選等變異或不等變異 t 檢定）。</li>
+    </ul>
+    <h4>如何使用？</h4>
+    <ol>
+      <li>兩組樣本數可以不同。先以 F 檢定確認變異數相等。</li>
+      <li>把兩組變異數「合併」成一個共同估計值 s_p²，計算：</li>
+    </ol>
+    <div class="formula">s_p² = [ (n₁−1)s₁² + (n₂−1)s₂² ] / (n₁+n₂−2)<br>
+      t = (x̄₁ − x̄₂ − Δ₀) / √( s_p² (1/n₁ + 1/n₂) )　（df = n₁+n₂−2）</div>
+    <ol start="3">
+      <li>H₀：μ₁ − μ₂ = Δ₀（通常 Δ₀=0，即兩組平均相等）。</li>
+      <li>p &lt; α → 兩組平均值顯著不同。</li>
+    </ol>
+    <h4>前提假設與注意事項</h4>
+    <ul>
+      <li>兩組獨立、母體近似常態、<b>變異數相等</b>。若 F 檢定顯示變異數不等，請改用「不等變異」分頁。</li>
+      <li>不確定變異數是否相等時，直接用不等變異（Welch）版本較穩健，結論通常不會更差。</li>
+      <li>Δ₀ 可設為非 0：例如想驗證「良率至少提升 2%」，把 Δ₀ 設為 −2（變數1=改善前）做單尾檢定。</li>
+    </ul>
+  </details>
+
+  <div class="card">
+    <h2>執行等變異 t 檢定</h2>
+    <div class="grid2">
+      <div>
+        <label class="fld">變數 1（例：舊治具批次良率）</label>
+        <textarea id="te-x1"></textarea>
+      </div>
+      <div>
+        <label class="fld">變數 2（例：新治具批次良率）</label>
+        <textarea id="te-x2"></textarea>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="ctl">顯著水準 α
+        <select id="te-alpha"><option>0.05</option><option>0.01</option><option>0.10</option></select>
+      </div>
+      <div class="ctl">假設的均數差 Δ₀
+        <input type="number" id="te-d0" value="0" step="any" style="width:90px">
+      </div>
+      <div class="ctl">結論依據
+        <select id="te-tail">
+          <option value="2">雙尾（兩組是否不同）</option>
+          <option value="1">單尾（依差值方向）</option>
+        </select>
+      </div>
+    </div>
+    <div class="btnrow">
+      <button class="run" onclick="runTEqual()">執行檢定</button>
+      <button class="demo" onclick="demoTEqual()">載入範例：新舊治具批次良率</button>
+    </div>
+    <div class="result" id="te-out"></div>
+  </div>
+</section>
+
+<!-- ═══════════════ t 不等變異 ═══════════════ -->
+<section class="panel" id="panel-twelch">
+  <details class="note" open>
+    <summary>📖 檢定說明：兩獨立樣本 t 檢定（假設變異數不相等，Welch）</summary>
+    <h4>什麼情形下使用？</h4>
+    <ul>
+      <li>同樣是比較兩批獨立樣本的平均值，但 F 檢定顯示兩組<b>變異數顯著不同</b>——這在製程改善中很常見：改善不只改變了平均，也讓變異縮小了。</li>
+      <li>兩組樣本數差距很大、或不確定變異數是否相等時，也建議直接使用本檢定（Welch 檢定即使變異數其實相等，結論也幾乎不受影響，是較安全的預設選擇）。</li>
+    </ul>
+    <h4>如何使用？</h4>
+    <ol>
+      <li>統計量不合併變異數，各自用各自的：</li>
+    </ol>
+    <div class="formula">t = (x̄₁ − x̄₂ − Δ₀) / √( s₁²/n₁ + s₂²/n₂ )</div>
+    <p>自由度以 Welch–Satterthwaite 公式估計（通常不是整數，Excel 會四捨五入為整數）：</p>
+    <div class="formula">df = (s₁²/n₁ + s₂²/n₂)² / [ (s₁²/n₁)²/(n₁−1) + (s₂²/n₂)²/(n₂−1) ]</div>
+    <ol start="2">
+      <li>H₀：μ₁ − μ₂ = Δ₀；p &lt; α → 兩組平均值顯著不同。</li>
+    </ol>
+    <h4>前提假設與注意事項</h4>
+    <ul>
+      <li>兩組獨立、母體近似常態；<b>不要求</b>變異數相等。</li>
+      <li>本工具同時顯示精確 df 與 Excel 取整後的結果，兩者 p 值差異極小。</li>
+    </ul>
+    <h4>判讀範例</h4>
+    <p>改善前平均 92.1%（s=2.4）、改善後平均 95.3%（s=0.9），t = −4.8，單尾 p &lt; 0.001 → 良率提升顯著，且變異同時縮小（可再用 F 檢定佐證穩定度改善）。</p>
+  </details>
+
+  <div class="card">
+    <h2>執行不等變異 t 檢定（Welch）</h2>
+    <div class="grid2">
+      <div>
+        <label class="fld">變數 1（例：改善前良率）</label>
+        <textarea id="tw-x1"></textarea>
+      </div>
+      <div>
+        <label class="fld">變數 2（例：改善後良率）</label>
+        <textarea id="tw-x2"></textarea>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="ctl">顯著水準 α
+        <select id="tw-alpha"><option>0.05</option><option>0.01</option><option>0.10</option></select>
+      </div>
+      <div class="ctl">假設的均數差 Δ₀
+        <input type="number" id="tw-d0" value="0" step="any" style="width:90px">
+      </div>
+      <div class="ctl">結論依據
+        <select id="tw-tail">
+          <option value="2">雙尾（兩組是否不同）</option>
+          <option value="1">單尾（依差值方向）</option>
+        </select>
+      </div>
+    </div>
+    <div class="btnrow">
+      <button class="run" onclick="runTWelch()">執行檢定</button>
+      <button class="demo" onclick="demoTWelch()">載入範例：改善前後良率（變異不同）</button>
+    </div>
+    <div class="result" id="tw-out"></div>
+  </div>
+</section>
+
+<!-- ═══════════════ 卡方 ═══════════════ -->
+<section class="panel" id="panel-chisq">
+  <details class="note" open>
+    <summary>📖 檢定說明：卡方檢定（適合度／獨立性）</summary>
+    <h4>什麼情形下使用？</h4>
+    <ul>
+      <li>資料是「類別的計數」而不是連續數值：各缺陷類型的件數、良品/不良品數、各班別的異常次數。</li>
+      <li><b>適合度檢定：</b>一組類別計數的分布是否符合預期分布——改善後缺陷類型的組成是否改變？是否仍符合歷史比例？</li>
+      <li><b>獨立性檢定：</b>兩個類別變數是否相關——缺陷類型是否與生產線/班別/機台有關？改善前後（一個變數）與良/不良（另一個變數）是否獨立？
+        <br>※「改善前後不良率是否下降」正是 2×2 獨立性檢定的典型應用。</li>
+      <li>Excel 的「資料分析」工具箱沒有卡方項目，需使用 <b>CHISQ.TEST(觀察範圍, 期望範圍)</b> 函數；本工具直接輸出統計量、自由度與 p 值。</li>
+    </ul>
+    <h4>如何使用？</h4>
+    <ol>
+      <li>整理觀察次數 O。適合度：再準備期望次數 E（可輸入比例，工具會自動換算）；獨立性：輸入列聯表，期望次數由「列合計 × 行合計 ÷ 總計」自動計算。</li>
+      <li>計算統計量：</li>
+    </ol>
+    <div class="formula">χ² = Σ (O − E)² / E　（適合度 df = k−1；獨立性 df = (列數−1)(行數−1)）</div>
+    <ol start="3">
+      <li>χ² 越大代表觀察值偏離期望越多；p &lt; α → 分布不符合期望／兩變數不獨立。</li>
+    </ol>
+    <h4>前提假設與注意事項</h4>
+    <ul>
+      <li>各觀察值互相獨立，資料為「次數」而非比例或平均值。</li>
+      <li>每格<b>期望次數建議 ≥ 5</b>；不足時應合併類別，或（2×2 表）改用 Fisher 精確檢定。本工具會自動警示。</li>
+      <li>卡方檢定永遠是右尾檢定（只看偏離是否過大），沒有單尾/雙尾之分。</li>
+    </ul>
+    <h4>判讀範例</h4>
+    <p>改善前 500 件中不良 40 件、改善後 500 件中不良 18 件，χ² = 8.9，p = 0.003 &lt; 0.05 → 不良率與改善前後「不獨立」，即改善顯著降低不良率。</p>
+  </details>
+
+  <div class="card">
+    <h2>執行卡方檢定</h2>
+    <div class="controls" style="margin-top:0">
+      <div class="ctl">檢定類型
+        <select id="c-mode" onchange="chisqMode()">
+          <option value="ind">獨立性檢定（列聯表）</option>
+          <option value="gof">適合度檢定（觀察 vs 期望）</option>
+        </select>
+      </div>
+      <div class="ctl">顯著水準 α
+        <select id="c-alpha"><option>0.05</option><option>0.01</option><option>0.10</option></select>
+      </div>
+    </div>
+
+    <div id="c-ind-in">
+      <label class="fld">列聯表（每行一列，數值以逗號/空白分隔；可加「列名:」開頭）</label>
+      <textarea id="c-table" placeholder="改善前: 460, 40&#10;改善後: 482, 18"></textarea>
+      <p class="hint">範例格式：列＝改善前/後（或班別），行＝良品/不良品（或缺陷類型），填入「件數」。</p>
+    </div>
+
+    <div id="c-gof-in" style="display:none">
+      <div class="grid2">
+        <div>
+          <label class="fld">觀察次數 O</label>
+          <textarea id="c-obs" placeholder="45, 30, 15, 10"></textarea>
+        </div>
+        <div>
+          <label class="fld">期望次數 E（輸入比例亦可，會依觀察總數換算）</label>
+          <textarea id="c-exp" placeholder="0.5, 0.3, 0.12, 0.08"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="btnrow">
+      <button class="run" onclick="runChisq()">執行檢定</button>
+      <button class="demo" onclick="demoChisq()">載入範例</button>
+    </div>
+    <div class="result" id="c-out"></div>
+  </div>
+</section>
+
+<!-- ═══════════════ 單因子 ANOVA ═══════════════ -->
+<section class="panel" id="panel-anova1">
+  <details class="note" open>
+    <summary>📖 檢定說明：單因子變異數分析（One-Way ANOVA）</summary>
+    <h4>什麼情形下使用？</h4>
+    <ul>
+      <li>比較「三組以上」的平均值：三種製程參數水準、四台機、多家供應商的產品強度是否有差異。</li>
+      <li>為什麼不做多次 t 檢定？三組兩兩比較要做 3 次 t 檢定，每次都有 5% 誤判風險，整體型一錯誤率會膨脹到約 14%。ANOVA 用一次檢定控制整體錯誤率。</li>
+    </ul>
+    <h4>如何使用？</h4>
+    <ol>
+      <li>每組收集獨立樣本（各組樣本數可以不同）。</li>
+      <li>把總變異拆成「組間變異」（因子造成）與「組內變異」（隨機誤差）：</li>
+    </ol>
+    <div class="formula">F = MS組間 / MS組內 = ( SSB/(k−1) ) / ( SSW/(N−k) )</div>
+    <ol start="3">
+      <li>H₀：所有組平均相等；H₁：至少一組不同。組間變異遠大於組內變異（F 大）→ 拒絕 H₀。</li>
+      <li>p &lt; α → 各組平均不全相等。<b>但 ANOVA 不會告訴你是哪幾組不同</b>，顯著後需做事後多重比較（如 Tukey HSD），或至少觀察各組平均與信賴區間。</li>
+    </ol>
+    <h4>前提假設與注意事項</h4>
+    <ul>
+      <li>各組獨立、母體近似常態、<b>各組變異數同質</b>（可先目視各組標準差，相差懸殊時考慮 Welch ANOVA 或資料轉換）。</li>
+      <li>兩組時 ANOVA 與等變異 t 檢定完全等價（F = t²）。</li>
+    </ul>
+    <h4>判讀範例</h4>
+    <p>三種退火溫度的平均硬度 F = 7.6，p = 0.004 &lt; 0.05 → 溫度水準對硬度有顯著影響，接著看哪個水準最佳並做事後比較確認。</p>
+  </details>
+
+  <div class="card">
+    <h2>執行單因子 ANOVA</h2>
+    <label class="fld">各組資料（每行一組，可加「組名:」開頭，數值以逗號/空白分隔）</label>
+    <textarea id="a1-data" style="min-height:130px" placeholder="180度: 62.1, 63.5, 61.8, 62.9&#10;200度: 65.2, 66.0, 64.8, 65.5&#10;220度: 64.1, 63.8, 64.6, 64.0"></textarea>
+    <div class="controls">
+      <div class="ctl">顯著水準 α
+        <select id="a1-alpha"><option>0.05</option><option>0.01</option><option>0.10</option></select>
+      </div>
+    </div>
+    <div class="btnrow">
+      <button class="run" onclick="runAnova1()">執行檢定</button>
+      <button class="demo" onclick="demoAnova1()">載入範例：三種退火溫度 vs 硬度</button>
+    </div>
+    <div class="result" id="a1-out"></div>
+  </div>
+</section>
+
+<!-- ═══════════════ 雙因子 ANOVA ═══════════════ -->
+<section class="panel" id="panel-anova2">
+  <details class="note" open>
+    <summary>📖 檢定說明：雙因子變異數分析（Two-Way ANOVA，無重複／重複試驗）</summary>
+    <h4>什麼情形下使用？</h4>
+    <ul>
+      <li>想「同時」評估兩個因子對品質特性的影響：溫度 × 壓力、操作員 × 機台、材料 × 治具。一次實驗回答兩個問題，比分開做兩次單因子實驗更有效率。</li>
+      <li><b>無重複試驗：</b>每個因子組合只量測 1 次（Excel：雙因子變異數分析－無重複試驗）。只能檢定兩個因子各自的主效果，<b>無法</b>估計交互作用。典型用途：隨機集區設計（把「機台」當集區因子，排除機台差異後檢定處理效果）。</li>
+      <li><b>重複試驗：</b>每個組合重複量測 r 次（r ≥ 2，且各格次數相同）（Excel：雙因子變異數分析－重複試驗）。可額外檢定<b>交互作用</b>——例如「高溫只有在高壓下才有效」這種組合效果，是製程窗口（process window）優化的關鍵資訊。</li>
+    </ul>
+    <h4>如何使用？</h4>
+    <ol>
+      <li>以「長格式」輸入資料：每行一筆觀測「因子A水準, 因子B水準, 數值」。工具會自動判斷每格次數：每格 1 筆 → 無重複；每格 r 筆（各格相同）→ 重複試驗。</li>
+      <li>總變異拆解為：因子 A、因子 B、（交互作用 A×B，僅重複試驗）、誤差；各自算 F 值與 p 值。</li>
+      <li><b>判讀順序（重複試驗）：先看交互作用。</b>交互作用顯著時，主效果不能單獨解讀，應改看「哪個組合最好」；交互作用不顯著，才分別解讀 A、B 的主效果。</li>
+    </ol>
+    <h4>前提假設與注意事項</h4>
+    <ul>
+      <li>各觀測獨立、誤差近似常態且變異數同質；重複試驗需為<b>平衡設計</b>（每格次數相同）。</li>
+      <li>無重複試驗其實是假設「沒有交互作用」才成立——若懷疑有交互作用，務必安排重複。</li>
+    </ul>
+    <h4>判讀範例</h4>
+    <p>溫度 p = 0.01（顯著）、壓力 p = 0.30（不顯著）、交互作用 p = 0.04（顯著）→ 因交互作用顯著，不能說「壓力沒影響」，應看組合平均：高溫+高壓的組合表現最佳。</p>
+  </details>
+
+  <div class="card">
+    <h2>執行雙因子 ANOVA</h2>
+    <label class="fld">長格式資料（每行：因子A水準, 因子B水準, 數值）</label>
+    <textarea id="a2-data" style="min-height:150px" placeholder="低溫, 低壓, 42.1&#10;低溫, 高壓, 43.0&#10;高溫, 低壓, 44.2&#10;高溫, 高壓, 47.9"></textarea>
+    <p class="hint">每格 1 筆 → 無重複試驗；每格重複 r 筆（各格相同）→ 重複試驗（含交互作用）。</p>
+    <div class="controls">
+      <div class="ctl">顯著水準 α
+        <select id="a2-alpha"><option>0.05</option><option>0.01</option><option>0.10</option></select>
+      </div>
+    </div>
+    <div class="btnrow">
+      <button class="run" onclick="runAnova2()">執行檢定</button>
+      <button class="demo" onclick="demoAnova2Rep()">範例：溫度×壓力（重複試驗）</button>
+      <button class="demo" onclick="demoAnova2NoRep()">範例：操作員×機台（無重複）</button>
+    </div>
+    <div class="result" id="a2-out"></div>
+  </div>
+</section>
+
+<footer>製程改善統計檢定工具｜計算邏輯對照 Excel 資料分析工具箱｜結果僅供工程判斷輔助</footer>
+</main>
+
+<script>
+/* ═══════════════ 數值函式庫（Lanczos / 不完全 beta / 不完全 gamma） ═══════════════ */
+function logGamma(x){
+  const c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,
+    771.32342877765313,-176.61502916214059,12.507343278686905,
+    -0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if(x<0.5) return Math.log(Math.PI/Math.sin(Math.PI*x))-logGamma(1-x);
+  x-=1; let a=c[0]; const t=x+7.5;
+  for(let i=1;i<9;i++) a+=c[i]/(x+i);
+  return 0.5*Math.log(2*Math.PI)+(x+0.5)*Math.log(t)-t+Math.log(a);
+}
+function betacf(a,b,x){
+  const FPMIN=1e-300; let qab=a+b,qap=a+1,qam=a-1;
+  let c=1,d=1-qab*x/qap;
+  if(Math.abs(d)<FPMIN)d=FPMIN; d=1/d; let h=d;
+  for(let m=1;m<=300;m++){
+    const m2=2*m;
+    let aa=m*(b-m)*x/((qam+m2)*(a+m2));
+    d=1+aa*d; if(Math.abs(d)<FPMIN)d=FPMIN;
+    c=1+aa/c; if(Math.abs(c)<FPMIN)c=FPMIN;
+    d=1/d; h*=d*c;
+    aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));
+    d=1+aa*d; if(Math.abs(d)<FPMIN)d=FPMIN;
+    c=1+aa/c; if(Math.abs(c)<FPMIN)c=FPMIN;
+    d=1/d; const del=d*c; h*=del;
+    if(Math.abs(del-1)<3e-15) break;
+  }
+  return h;
+}
+function ibeta(a,b,x){ // 正規化不完全 beta I_x(a,b)
+  if(x<=0) return 0; if(x>=1) return 1;
+  const bt=Math.exp(logGamma(a+b)-logGamma(a)-logGamma(b)+a*Math.log(x)+b*Math.log(1-x));
+  if(x<(a+1)/(a+b+2)) return bt*betacf(a,b,x)/a;
+  return 1-bt*betacf(b,a,1-x)/b;
+}
+function gammp(a,x){ // 正規化下不完全 gamma P(a,x)
+  if(x<=0) return 0;
+  if(x<a+1){
+    let ap=a,sum=1/a,del=sum;
+    for(let n=0;n<600;n++){
+      ap++; del*=x/ap; sum+=del;
+      if(Math.abs(del)<Math.abs(sum)*1e-15) break;
+    }
+    return sum*Math.exp(-x+a*Math.log(x)-logGamma(a));
+  }
+  let b=x+1-a,c=1e300,d=1/b,h=d;
+  for(let i=1;i<=600;i++){
+    const an=-i*(i-a); b+=2;
+    d=an*d+b; if(Math.abs(d)<1e-300)d=1e-300;
+    c=b+an/c; if(Math.abs(c)<1e-300)c=1e-300;
+    d=1/d; const del=d*c; h*=del;
+    if(Math.abs(del-1)<1e-15) break;
+  }
+  return 1-Math.exp(-x+a*Math.log(x)-logGamma(a))*h;
+}
+/* 分布 CDF */
+const tCDF   =(t,df)=> t>=0 ? 1-0.5*ibeta(df/2,0.5,df/(df+t*t)) : 0.5*ibeta(df/2,0.5,df/(df+t*t));
+const fCDF   =(f,d1,d2)=> f<=0?0:ibeta(d1/2,d2/2,d1*f/(d1*f+d2));
+const chiCDF =(x,k)=> gammp(k/2,x/2);
+/* 反函數（二分法） */
+function invCDF(cdf,p,hi){
+  let lo=0; hi=hi||1e7;
+  for(let i=0;i<200;i++){
+    const mid=(lo+hi)/2;
+    if(cdf(mid)<p) lo=mid; else hi=mid;
+  }
+  return (lo+hi)/2;
+}
+const tCrit1 =(a,df)=> invCDF(t=>tCDF(t,df),1-a,1e4);
+const tCrit2 =(a,df)=> invCDF(t=>tCDF(t,df),1-a/2,1e4);
+const fCrit  =(a,d1,d2)=> invCDF(f=>fCDF(f,d1,d2),1-a);
+const chiCrit=(a,df)=> invCDF(x=>chiCDF(x,df),1-a);
+
+/* ═══════════════ 基本統計 ═══════════════ */
+const sum =v=>v.reduce((s,x)=>s+x,0);
+const mean=v=>sum(v)/v.length;
+function variance(v){ // 樣本變異數 (n-1)
+  const m=mean(v);
+  return v.reduce((s,x)=>s+(x-m)*(x-m),0)/(v.length-1);
+}
+function pearson(x,y){
+  const mx=mean(x),my=mean(y);
+  let sxy=0,sxx=0,syy=0;
+  for(let i=0;i<x.length;i++){
+    sxy+=(x[i]-mx)*(y[i]-my); sxx+=(x[i]-mx)**2; syy+=(y[i]-my)**2;
+  }
+  return sxy/Math.sqrt(sxx*syy);
+}
+
+/* ═══════════════ 解析與顯示工具 ═══════════════ */
+function parseNums(text){
+  return (text||'').split(/[\s,;、，]+/).filter(s=>s!=='').map(s=>{
+    const v=parseFloat(s);
+    if(!isFinite(v)) throw `無法解析數值：「${s}」`;
+    return v;
+  });
+}
+function parseLines(text){ // 每行: 可選「名稱:」+ 數值串
+  const lines=(text||'').split(/\n/).map(s=>s.trim()).filter(s=>s!=='');
+  return lines.map((line,i)=>{
+    let name=null, body=line;
+    const m=line.match(/^([^:：]+)[:：](.*)$/);
+    if(m && m[2].trim()!==''){ name=m[1].trim(); body=m[2]; }
+    return {name:name||`第 ${i+1} 組`, values:parseNums(body)};
+  });
+}
+function fmt(x,dp){
+  if(!isFinite(x)) return '—';
+  if(dp!==undefined) return x.toFixed(dp);
+  const ax=Math.abs(x);
+  if(ax!==0&&(ax<0.001||ax>=1e6)) return x.toExponential(4);
+  return parseFloat(x.toPrecision(6)).toString();
+}
+function fmtP(p){
+  if(!isFinite(p)) return '—';
+  p=Math.min(Math.max(p,0),1);
+  return p<0.0001 ? '&lt; 0.0001' : p.toFixed(4);
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function err(el,msg){document.getElementById(el).innerHTML=`<div class="errbox">⚠ ${msg}</div>`;}
+function verdict(p,alpha,sigText,nsText){
+  const sig=p<alpha;
+  return `<div class="verdict ${sig?'sig':'ns'}">
+    <b>${sig?'✅ 拒絕 H₀（差異顯著）':'⬜ 無法拒絕 H₀（差異不顯著）'}</b><br>
+    p 值 ${fmtP(p)} ${sig?'&lt;':'≥'} α = ${alpha} → ${sig?sigText:nsText}</div>`;
+}
+function descTable(names,groups){
+  let h='<div class="tablewrap"><table class="res"><tr><th></th>';
+  names.forEach(n=>h+=`<th>${esc(n)}</th>`); h+='</tr>';
+  const rows=[['平均數',g=>fmt(mean(g))],['變異數',g=>fmt(variance(g))],
+              ['標準差',g=>fmt(Math.sqrt(variance(g)))],['觀察值個數',g=>g.length]];
+  rows.forEach(([lab,f])=>{
+    h+=`<tr><td>${lab}</td>`; groups.forEach(g=>h+=`<td>${f(g)}</td>`); h+='</tr>';
+  });
+  return h+'</table></div>';
+}
+
+/* ═══════════════ 分頁切換 ═══════════════ */
+document.getElementById('tabs').addEventListener('click',e=>{
+  const btn=e.target.closest('button'); if(!btn) return;
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b===btn));
+  document.querySelectorAll('section.panel').forEach(p=>
+    p.classList.toggle('active',p.id==='panel-'+btn.dataset.tab));
+  window.scrollTo({top:0});
+});
+
+/* ═══════════════ F 檢定 ═══════════════ */
+function runF(){
+  try{
+    const x1=parseNums(f_val('f-x1')), x2=parseNums(f_val('f-x2'));
+    if(x1.length<2||x2.length<2) return err('f-out','兩組各至少需要 2 筆資料。');
+    const alpha=parseFloat(f_val('f-alpha')), tail=f_val('f-tail');
+    const v1=variance(x1),v2=variance(x2), F=v1/v2, d1=x1.length-1,d2=x2.length-1;
+    const cdf=fCDF(F,d1,d2);
+    const p1=F>=1 ? 1-cdf : cdf;              // 單尾（觀察方向）
+    const p2=Math.min(2*p1,1);                 // 雙尾
+    const critR=fCrit(alpha,d1,d2), critL=1/fCrit(alpha,d2,d1);
+    const p=tail==='1' ? (1-cdf) : p2;         // 單尾結論固定檢驗 σ1²>σ2²
+    let h=descTable(['變數 1','變數 2'],[x1,x2]);
+    h+=`<div class="tablewrap"><table class="res">
+      <tr><td>F 統計量（s₁²/s₂²）</td><td>${fmt(F)}</td></tr>
+      <tr><td>自由度</td><td>df₁ = ${d1}，df₂ = ${d2}</td></tr>
+      <tr><td>P(F&lt;=f) 單尾（Excel 報表值）</td><td>${fmtP(p1)}</td></tr>
+      <tr><td>P 值（雙尾：變異數是否不同）</td><td>${fmtP(p2)}</td></tr>
+      <tr><td>臨界值 單尾右 F(α)</td><td>${fmt(critR)}</td></tr>
+      <tr><td>臨界值 雙尾 [F(1−α/2), F(α/2)]</td><td>[${fmt(1/fCrit(alpha/2,d2,d1))}, ${fmt(fCrit(alpha/2,d1,d2))}]</td></tr>
+    </table></div>`;
+    void critL;
+    h+=verdict(p,alpha,
+      `兩組變異數有顯著差異（${v1>v2?'變數 1 變異較大':'變數 2 變異較大'}）。若變數 1=改善前、變數 2=改善後且 s₁²&gt;s₂²，代表改善後製程更穩定。後續獨立樣本 t 檢定請使用「不等變異」版本。`,
+      `尚無足夠證據說兩組變異數不同。後續獨立樣本 t 檢定可使用「等變異」版本。`);
+    document.getElementById('f-out').innerHTML=h;
+  }catch(e){err('f-out',e);}
+}
+function demoF(){
+  set('f-x1','25.31 25.02 24.68 25.45 24.87 25.60 24.51 25.22 24.95 25.38 24.72 25.11');
+  set('f-x2','25.05 25.12 24.98 25.08 25.02 24.95 25.10 25.00 25.06 24.97 25.09 25.03');
+  runF();
+}
+
+/* ═══════════════ t 成對 ═══════════════ */
+function runTPaired(){
+  try{
+    const x1=parseNums(f_val('tp-x1')), x2=parseNums(f_val('tp-x2'));
+    if(x1.length!==x2.length) return err('tp-out',`成對檢定需筆數相同（目前 ${x1.length} vs ${x2.length}）。`);
+    if(x1.length<2) return err('tp-out','至少需要 2 對資料。');
+    const alpha=parseFloat(f_val('tp-alpha')), d0=parseFloat(f_val('tp-d0'))||0, tail=f_val('tp-tail');
+    const d=x1.map((v,i)=>v-x2[i]), n=d.length, md=mean(d), sd=Math.sqrt(variance(d));
+    const t=(md-d0)/(sd/Math.sqrt(n)), df=n-1;
+    outputT('tp-out',{x1,x2,t,df,alpha,tail,
+      extra:[['皮爾森相關係數',fmt(pearson(x1,x2))],['平均差 d̄',fmt(md)],['差的標準差 s_d',fmt(sd)],['假設的均數差',fmt(d0)]],
+      sigText:`改善前後平均有顯著差異（平均差 ${fmt(md)}，${md>0?'變數 1 較大':'變數 2 較大'}）。`,
+      nsText:`尚無足夠證據說改善前後平均不同（平均差 ${fmt(md)} 可能只是隨機波動）。`});
+  }catch(e){err('tp-out',e);}
+}
+function demoTPaired(){
+  set('tp-x1','58.2 61.5 55.0 63.1 59.8 57.4 60.9 62.0 56.7 58.8');
+  set('tp-x2','55.9 59.7 53.8 60.5 58.2 55.1 59.0 59.8 55.2 56.6');
+  runTPaired();
+}
+
+/* ═══════════════ t 等變異 ═══════════════ */
+function runTEqual(){
+  try{
+    const x1=parseNums(f_val('te-x1')), x2=parseNums(f_val('te-x2'));
+    if(x1.length<2||x2.length<2) return err('te-out','兩組各至少需要 2 筆資料。');
+    const alpha=parseFloat(f_val('te-alpha')), d0=parseFloat(f_val('te-d0'))||0, tail=f_val('te-tail');
+    const n1=x1.length,n2=x2.length,v1=variance(x1),v2=variance(x2);
+    const sp2=((n1-1)*v1+(n2-1)*v2)/(n1+n2-2);
+    const t=(mean(x1)-mean(x2)-d0)/Math.sqrt(sp2*(1/n1+1/n2)), df=n1+n2-2;
+    outputT('te-out',{x1,x2,t,df,alpha,tail,
+      extra:[['Pooled 變異數 s_p²',fmt(sp2)],['假設的均數差 Δ₀',fmt(d0)]],
+      sigText:`兩組平均值有顯著差異（x̄₁−x̄₂ = ${fmt(mean(x1)-mean(x2))}）。`,
+      nsText:`尚無足夠證據說兩組平均不同。`});
+  }catch(e){err('te-out',e);}
+}
+function demoTEqual(){
+  set('te-x1','93.1 94.5 92.8 95.0 93.6 94.2 92.5 93.9 94.8 93.3');
+  set('te-x2','95.2 96.1 94.8 96.5 95.7 94.9 96.3 95.5 95.0 96.0');
+  runTEqual();
+}
+
+/* ═══════════════ t 不等變異 ═══════════════ */
+function runTWelch(){
+  try{
+    const x1=parseNums(f_val('tw-x1')), x2=parseNums(f_val('tw-x2'));
+    if(x1.length<2||x2.length<2) return err('tw-out','兩組各至少需要 2 筆資料。');
+    const alpha=parseFloat(f_val('tw-alpha')), d0=parseFloat(f_val('tw-d0'))||0, tail=f_val('tw-tail');
+    const n1=x1.length,n2=x2.length,v1=variance(x1),v2=variance(x2);
+    const se2=v1/n1+v2/n2;
+    const t=(mean(x1)-mean(x2)-d0)/Math.sqrt(se2);
+    const df=se2*se2/((v1/n1)**2/(n1-1)+(v2/n2)**2/(n2-1)); // Welch–Satterthwaite
+    outputT('tw-out',{x1,x2,t,df,alpha,tail,
+      extra:[['Welch 自由度（精確）',fmt(df)],['Excel 取整自由度',Math.round(df)],['假設的均數差 Δ₀',fmt(d0)]],
+      sigText:`兩組平均值有顯著差異（x̄₁−x̄₂ = ${fmt(mean(x1)-mean(x2))}）。`,
+      nsText:`尚無足夠證據說兩組平均不同。`});
+  }catch(e){err('tw-out',e);}
+}
+function demoTWelch(){
+  set('tw-x1','92.5 89.1 94.8 87.6 95.2 90.3 88.4 93.9 91.7 86.9 94.1 90.8');
+  set('tw-x2','95.6 96.2 95.1 96.8 95.9 96.4 95.3 96.0 95.7 96.5 95.4 96.1');
+  runTWelch();
+}
+
+/* 共同的 t 檢定輸出 */
+function outputT(el,{x1,x2,t,df,alpha,tail,extra,sigText,nsText}){
+  const p1= t>=0 ? 1-tCDF(t,df) : tCDF(t,df); // 依觀察方向的單尾
+  const p2=Math.min(2*p1,1);
+  const p= tail==='1'? p1 : p2;
+  let h=descTable(['變數 1','變數 2'],[x1,x2]);
+  h+='<div class="tablewrap"><table class="res">';
+  (extra||[]).forEach(([k,v])=>h+=`<tr><td>${k}</td><td>${v}</td></tr>`);
+  h+=`<tr><td>t 統計量</td><td>${fmt(t)}</td></tr>
+    <tr><td>自由度 df</td><td>${fmt(df)}</td></tr>
+    <tr><td>P(T&lt;=t) 單尾</td><td>${fmtP(p1)}</td></tr>
+    <tr><td>臨界值：單尾</td><td>${fmt(tCrit1(alpha,df))}</td></tr>
+    <tr><td>P(T&lt;=t) 雙尾</td><td>${fmtP(p2)}</td></tr>
+    <tr><td>臨界值：雙尾</td><td>${fmt(tCrit2(alpha,df))}</td></tr>
+  </table></div>`;
+  h+=verdict(p,alpha,sigText,nsText);
+  if(tail==='1') h+=`<p class="hint">※ 單尾 p 值以「觀察到的差異方向」計算；單尾方向應在收資料前決定。</p>`;
+  document.getElementById(el).innerHTML=h;
+}
+
+/* ═══════════════ 卡方 ═══════════════ */
+function chisqMode(){
+  const ind=f_val('c-mode')==='ind';
+  document.getElementById('c-ind-in').style.display=ind?'':'none';
+  document.getElementById('c-gof-in').style.display=ind?'none':'';
+}
+function runChisq(){
+  try{
+    const alpha=parseFloat(f_val('c-alpha'));
+    let O=[],E=[],df,desc,labels=null;
+    if(f_val('c-mode')==='ind'){
+      const rows=parseLines(f_val('c-table'));
+      if(rows.length<2) return err('c-out','列聯表至少需要 2 列。');
+      const nc=rows[0].values.length;
+      if(nc<2) return err('c-out','列聯表至少需要 2 行。');
+      if(rows.some(r=>r.values.length!==nc)) return err('c-out','每一列的行數必須相同。');
+      const tbl=rows.map(r=>r.values);
+      const rSum=tbl.map(r=>sum(r));
+      const cSum=Array.from({length:nc},(_,j)=>sum(tbl.map(r=>r[j])));
+      const N=sum(rSum);
+      tbl.forEach((r,i)=>r.forEach((o,j)=>{O.push(o); E.push(rSum[i]*cSum[j]/N);}));
+      df=(rows.length-1)*(nc-1);
+      desc=`獨立性檢定：${rows.length} 列 × ${nc} 行，總次數 N = ${N}`;
+      labels=rows.map(r=>r.name);
+      // 期望次數表
+      var expTable='<h3>期望次數 E（列合計×行合計÷總計）</h3><div class="tablewrap"><table class="res"><tr><th></th>';
+      for(let j=0;j<nc;j++) expTable+=`<th>行 ${j+1}</th>`; expTable+='</tr>';
+      rows.forEach((r,i)=>{
+        expTable+=`<tr><td>${esc(r.name)}</td>`;
+        r.values.forEach((_,j)=>expTable+=`<td>${fmt(rSum[i]*cSum[j]/N,2)}</td>`);
+        expTable+='</tr>';
+      });
+      expTable+='</table></div>';
+    }else{
+      O=parseNums(f_val('c-obs')); E=parseNums(f_val('c-exp'));
+      if(O.length<2) return err('c-out','至少需要 2 個類別。');
+      if(O.length!==E.length) return err('c-out',`觀察與期望的類別數必須相同（目前 ${O.length} vs ${E.length}）。`);
+      const sO=sum(O),sE=sum(E);
+      var scaled=false;
+      if(Math.abs(sO-sE)>1e-9*Math.max(sO,sE)){ E=E.map(e=>e*sO/sE); scaled=true; }
+      df=O.length-1;
+      desc=`適合度檢定：${O.length} 個類別，觀察總數 = ${fmt(sO)}`+(scaled?'（期望值已依觀察總數等比換算）':'');
+    }
+    if(E.some(e=>e<=0)) return err('c-out','期望次數必須為正值。');
+    const chi=O.reduce((s,o,i)=>s+(o-E[i])**2/E[i],0);
+    const p=1-chiCDF(chi,df);
+    let h=`<p class="hint">${desc}</p>`;
+    if(typeof expTable!=='undefined'&&f_val('c-mode')==='ind') h+=expTable;
+    h+=`<div class="tablewrap"><table class="res">
+      <tr><td>χ² 統計量</td><td>${fmt(chi)}</td></tr>
+      <tr><td>自由度 df</td><td>${df}</td></tr>
+      <tr><td>P 值（右尾）</td><td>${fmtP(p)}</td></tr>
+      <tr><td>臨界值 χ²(α)</td><td>${fmt(chiCrit(alpha,df))}</td></tr>
+    </table></div>`;
+    if(E.some(e=>e<5)) h+=`<div class="warnbox">⚠ 有期望次數 &lt; 5 的格子（最小 ${fmt(Math.min(...E),2)}），卡方近似可能不準確。建議合併類別，或改用 Fisher 精確檢定。</div>`;
+    h+=verdict(p,alpha,
+      f_val('c-mode')==='ind'
+        ?`兩個類別變數不獨立（有關聯）。若列為改善前/後、行為良/不良，代表改善前後的不良率有顯著差異。`
+        :`觀察分布與期望分布顯著不同（分布已改變）。`,
+      f_val('c-mode')==='ind'
+        ?`尚無足夠證據說兩變數有關聯。`
+        :`尚無足夠證據說分布不符合期望。`);
+    void labels;
+    document.getElementById('c-out').innerHTML=h;
+  }catch(e){err('c-out',e);}
+}
+function demoChisq(){
+  if(f_val('c-mode')==='ind'){
+    set('c-table','改善前: 460, 40\n改善後: 482, 18');
+  }else{
+    set('c-obs','52, 31, 12, 5');
+    set('c-exp','0.40, 0.35, 0.15, 0.10');
+  }
+  runChisq();
+}
+
+/* ═══════════════ 單因子 ANOVA ═══════════════ */
+function runAnova1(){
+  try{
+    const groups=parseLines(f_val('a1-data'));
+    if(groups.length<2) return err('a1-out','至少需要 2 組資料（每行一組）。');
+    if(groups.some(g=>g.values.length<2)) return err('a1-out','每組至少需要 2 筆資料。');
+    const alpha=parseFloat(f_val('a1-alpha'));
+    const all=groups.flatMap(g=>g.values), N=all.length, k=groups.length, gm=mean(all);
+    let ssb=0,ssw=0;
+    groups.forEach(g=>{
+      const m=mean(g.values);
+      ssb+=g.values.length*(m-gm)**2;
+      g.values.forEach(x=>ssw+=(x-m)**2);
+    });
+    const dfb=k-1, dfw=N-k, msb=ssb/dfb, msw=ssw/dfw;
+    const F=msb/msw, p=1-fCDF(F,dfb,dfw);
+    let h=descTable(groups.map(g=>g.name),groups.map(g=>g.values));
+    h+=`<h3>ANOVA 表</h3><div class="tablewrap"><table class="res">
+      <tr><th>變源</th><th>SS</th><th>df</th><th>MS</th><th>F</th><th>P 值</th><th>臨界值</th></tr>
+      <tr><td>組間</td><td>${fmt(ssb)}</td><td>${dfb}</td><td>${fmt(msb)}</td><td>${fmt(F)}</td><td>${fmtP(p)}</td><td>${fmt(fCrit(alpha,dfb,dfw))}</td></tr>
+      <tr><td>組內</td><td>${fmt(ssw)}</td><td>${dfw}</td><td>${fmt(msw)}</td><td></td><td></td><td></td></tr>
+      <tr><td>總和</td><td>${fmt(ssb+ssw)}</td><td>${N-1}</td><td></td><td></td><td></td><td></td></tr>
+    </table></div>`;
+    h+=verdict(p,alpha,
+      `各組平均不全相等——因子（參數水準/機台/供應商…）有顯著影響。請接著比較各組平均找出最佳水準，並以事後檢定（如 Tukey HSD）確認哪幾組間有差異。`,
+      `尚無足夠證據說各組平均有差異。`);
+    document.getElementById('a1-out').innerHTML=h;
+  }catch(e){err('a1-out',e);}
+}
+function demoAnova1(){
+  set('a1-data','180度: 62.1, 63.5, 61.8, 62.9, 62.4\n200度: 65.2, 66.0, 64.8, 65.5, 65.1\n220度: 64.1, 63.8, 64.6, 64.0, 63.5');
+  runAnova1();
+}
+
+/* ═══════════════ 雙因子 ANOVA ═══════════════ */
+function runAnova2(){
+  try{
+    const alpha=parseFloat(f_val('a2-alpha'));
+    const lines=(f_val('a2-data')||'').split(/\n/).map(s=>s.trim()).filter(s=>s!=='');
+    if(lines.length<4) return err('a2-out','至少需要 4 筆觀測（2×2 設計）。');
+    const rec=lines.map(line=>{
+      const parts=line.split(/[\t,，]/).map(s=>s.trim()).filter(s=>s!=='');
+      if(parts.length!==3) throw `每行需為「因子A, 因子B, 數值」三欄：「${esc(line)}」`;
+      const v=parseFloat(parts[2]);
+      if(!isFinite(v)) throw `無法解析數值：「${esc(parts[2])}」`;
+      return {a:parts[0], b:parts[1], y:v};
+    });
+    const A=[...new Set(rec.map(r=>r.a))], B=[...new Set(rec.map(r=>r.b))];
+    const ra=A.length, cb=B.length;
+    if(ra<2||cb<2) return err('a2-out','因子 A 與因子 B 各至少需要 2 個水準。');
+    // 依格分組
+    const cell={};
+    A.forEach(a=>B.forEach(b=>cell[a+'␟'+b]=[]));
+    rec.forEach(r=>{
+      if(!(r.a+'␟'+r.b in cell)) throw '資料異常';
+      cell[r.a+'␟'+r.b].push(r.y);
+    });
+    const counts=Object.values(cell).map(v=>v.length);
+    if(counts.some(c=>c===0)) return err('a2-out','有因子組合缺少資料，請補齊所有 A×B 組合。');
+    const r0=counts[0];
+    if(counts.some(c=>c!==r0)) return err('a2-out',`每個組合的重複次數必須相同（平衡設計），目前為 ${counts.join(', ')}。`);
+    const rep=r0, N=rec.length, gm=mean(rec.map(r=>r.y));
+    const aMean={},bMean={};
+    A.forEach(a=>aMean[a]=mean(rec.filter(r=>r.a===a).map(r=>r.y)));
+    B.forEach(b=>bMean[b]=mean(rec.filter(r=>r.b===b).map(r=>r.y)));
+    const ssA=cb*rep*A.reduce((s,a)=>s+(aMean[a]-gm)**2,0);
+    const ssB=ra*rep*B.reduce((s,b)=>s+(bMean[b]-gm)**2,0);
+    const ssT=rec.reduce((s,r)=>s+(r.y-gm)**2,0);
+    let h='',rows=[];
+    if(rep===1){ // 無重複試驗
+      const ssE=ssT-ssA-ssB;
+      const dfA=ra-1,dfB=cb-1,dfE=dfA*dfB;
+      rows=[
+        ['因子 A（列）',ssA,dfA,ssE/dfE],
+        ['因子 B（行）',ssB,dfB,ssE/dfE],
+        ['誤差',ssE,dfE,null],
+      ];
+      h+=`<p class="hint">每組合 1 筆 → <b>無重複試驗</b>（無法估計交互作用）。A 水準：${A.map(esc).join('、')}；B 水準：${B.map(esc).join('、')}。</p>`;
+      h+=anova2Table(rows,ssT,N-1,alpha);
+      const pA=rows[0].p,pB=rows[1].p;
+      h+=verdict(Math.min(pA,pB),alpha,
+        `${pA<alpha?`因子 A 顯著（p=${fmtP(pA)}）`:''}${pA<alpha&&pB<alpha?'；':''}${pB<alpha?`因子 B 顯著（p=${fmtP(pB)}）`:''}——顯著的因子對品質特性有真實影響，請依水準平均值選擇最佳條件。`,
+        `兩因子皆不顯著，尚無證據顯示 A 或 B 影響量測值。`);
+    }else{ // 重複試驗
+      let ssCell=0;
+      A.forEach(a=>B.forEach(b=>{
+        const m=mean(cell[a+'␟'+b]);
+        ssCell+=rep*(m-gm)**2;
+      }));
+      const ssAB=ssCell-ssA-ssB;
+      const ssE=ssT-ssCell;
+      const dfA=ra-1,dfB=cb-1,dfAB=dfA*dfB,dfE=ra*cb*(rep-1);
+      const msE=ssE/dfE;
+      rows=[
+        ['因子 A',ssA,dfA,msE],
+        ['因子 B',ssB,dfB,msE],
+        ['交互作用 A×B',ssAB,dfAB,msE],
+        ['誤差（組內）',ssE,dfE,null],
+      ];
+      h+=`<p class="hint">每組合 ${rep} 筆 → <b>重複試驗</b>（含交互作用）。A 水準：${A.map(esc).join('、')}；B 水準：${B.map(esc).join('、')}。</p>`;
+      // 各組合平均表
+      h+='<h3>各組合平均</h3><div class="tablewrap"><table class="res"><tr><th>A \\ B</th>';
+      B.forEach(b=>h+=`<th>${esc(b)}</th>`); h+='<th>A 平均</th></tr>';
+      A.forEach(a=>{
+        h+=`<tr><td>${esc(a)}</td>`;
+        B.forEach(b=>h+=`<td>${fmt(mean(cell[a+'␟'+b]))}</td>`);
+        h+=`<td>${fmt(aMean[a])}</td></tr>`;
+      });
+      h+='<tr><td>B 平均</td>';
+      B.forEach(b=>h+=`<td>${fmt(bMean[b])}</td>`);
+      h+=`<td>${fmt(gm)}</td></tr></table></div>`;
+      h+=anova2Table(rows,ssT,N-1,alpha);
+      const pA=rows[0].p,pB=rows[1].p,pAB=rows[2].p;
+      const sigs=[];
+      if(pA<alpha)sigs.push('因子 A');
+      if(pB<alpha)sigs.push('因子 B');
+      if(pAB<alpha)sigs.push('交互作用 A×B');
+      h+=verdict(Math.min(pA,pB,pAB),alpha,
+        `顯著項目：${sigs.join('、')}。${pAB<alpha
+          ?'<b>交互作用顯著</b> → 兩因子效果互相牽動，主效果不能單獨解讀，請直接比較「各組合平均」表，選擇最佳的參數組合。'
+          :'交互作用不顯著 → 可分別解讀 A、B 主效果，依各水準平均選擇最佳條件。'}`,
+        `A、B 與交互作用皆不顯著，尚無證據顯示這兩個因子影響量測值。`);
+    }
+    document.getElementById('a2-out').innerHTML=h;
+  }catch(e){err('a2-out',e);}
+}
+function anova2Table(rows,ssT,dfT,alpha){
+  let h='<h3>ANOVA 表</h3><div class="tablewrap"><table class="res"><tr><th>變源</th><th>SS</th><th>df</th><th>MS</th><th>F</th><th>P 值</th><th>臨界值</th></tr>';
+  const msE=rows[rows.length-1][1]/rows[rows.length-1][2];
+  rows.forEach(row=>{
+    const [name,ss,df]=row;
+    const ms=ss/df;
+    if(row[3]!==null){
+      const F=ms/msE, p=1-fCDF(F,df,rows[rows.length-1][2]);
+      row.p=p;
+      h+=`<tr><td>${name}</td><td>${fmt(ss)}</td><td>${df}</td><td>${fmt(ms)}</td><td>${fmt(F)}</td><td>${fmtP(p)}</td><td>${fmt(fCrit(alpha,df,rows[rows.length-1][2]))}</td></tr>`;
+    }else{
+      h+=`<tr><td>${name}</td><td>${fmt(ss)}</td><td>${df}</td><td>${fmt(ms)}</td><td></td><td></td><td></td></tr>`;
+    }
+  });
+  h+=`<tr><td>總和</td><td>${fmt(ssT)}</td><td>${dfT}</td><td></td><td></td><td></td><td></td></tr></table></div>`;
+  return h;
+}
+function demoAnova2Rep(){
+  set('a2-data',
+`低溫, 低壓, 42.1
+低溫, 低壓, 41.8
+低溫, 低壓, 42.5
+低溫, 高壓, 43.0
+低溫, 高壓, 42.6
+低溫, 高壓, 43.4
+高溫, 低壓, 43.8
+高溫, 低壓, 44.2
+高溫, 低壓, 43.5
+高溫, 高壓, 47.9
+高溫, 高壓, 48.5
+高溫, 高壓, 47.6`);
+  runAnova2();
+}
+function demoAnova2NoRep(){
+  set('a2-data',
+`甲, 機台1, 88.2
+甲, 機台2, 90.1
+甲, 機台3, 86.5
+乙, 機台1, 89.5
+乙, 機台2, 91.4
+乙, 機台3, 88.0
+丙, 機台1, 87.1
+丙, 機台2, 89.0
+丙, 機台3, 85.8`);
+  runAnova2();
+}
+
+/* helpers */
+function f_val(id){return document.getElementById(id).value;}
+function set(id,v){document.getElementById(id).value=v;}
+</script>
+</body>
+</html>

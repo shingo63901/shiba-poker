@@ -1,0 +1,59 @@
+name: Build Project-PV (Windows)
+
+on:
+  push:
+    branches:
+      - claude/statistical-validation-project-wi808l
+      - main
+    paths:
+      - "statistical-validation-py/**"
+      - ".github/workflows/build-exe.yml"
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package and PyInstaller
+        run: |
+          pip install pyinstaller ./statistical-validation-py
+
+      - name: Run tests
+        run: |
+          pip install pytest
+          python -m pytest statistical-validation-py/tests -q
+
+      - name: Build one-folder distribution
+        run: |
+          pyinstaller --onedir --name pv --console --clean --noconfirm statistical-validation-py/packaging/pv_entry.py
+
+      - name: Assemble Project-PV folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path out/Project-PV | Out-Null
+          Copy-Item -Recurse dist/pv/* out/Project-PV/
+          Copy-Item 'statistical-validation-py/packaging/windows/使用說明.txt' out/Project-PV/
+          & out/Project-PV/pv.exe sample-data out/Project-PV/範例資料.xlsx
+          $demo = "@echo off","chcp 65001 >nul",'cd /d "%~dp0"',"pv.exe demo","echo.","pause"
+          Set-Content -Path 'out/Project-PV/執行範例.bat' -Value $demo -Encoding ascii
+          $advisor = "@echo off","chcp 65001 >nul",'cd /d "%~dp0"',"pv.exe advisor","echo.","pause"
+          Set-Content -Path 'out/Project-PV/檢定選擇指引.bat' -Value $advisor -Encoding ascii
+
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          & out/Project-PV/pv.exe demo
+          & out/Project-PV/pv.exe chi-ind --rows "460,40;482,18"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Project-PV-windows
+          path: out
+          retention-days: 90
